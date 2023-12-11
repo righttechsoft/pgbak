@@ -1,5 +1,8 @@
 FROM ubuntu:latest
 
+ENV MONGO_URL $MONGO_URL
+ENV MONGO_DB $MONGO_DB
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     build-essential \
@@ -22,4 +25,16 @@ RUN sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-16
 
-ENTRYPOINT ["top", "-b"]
+
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC && apt-get install -y --no-install-recommends python3.11-full python3-pip
+RUN python3.11 -m pip install pipenv
+
+# Set default work directory
+WORKDIR /app
+
+# Copy project code
+COPY . .
+
+CMD printenv > /etc/cron.d/cron && cat /app/crontab >> /etc/cron.d/cron && chmod 0644 /etc/cron.d/cron && crontab /etc/cron.d/cron && cron && rsyslogd && sleep 2 && tail -F /var/log/syslog
+

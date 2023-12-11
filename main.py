@@ -3,26 +3,33 @@ import traceback
 import subprocess
 import os
 
+from datetime import datetime
 from tempfile import TemporaryDirectory
 
-from base import BaseScript
+from base import BaseScript, logger
 from asyncpg import Connection
 
 
-class OrdersFromBc(BaseScript):
+class PgBak(BaseScript):
     def __init__(self, name: str):
         super().__init__(name)
 
     async def work(self):
         with TemporaryDirectory() as temp_dir:
             os.chdir(temp_dir)
+            logger.debug(f'Created tmp dir {temp_dir}')
             connection_string_rows = await self.get_db_connection_strings()
             for cs_row in connection_string_rows:
                 connection_string = f'postgres://{cs_row["user"]}:{cs_row["password"]}@{cs_row["host"]}:{cs_row["port"]}/{cs_row["database"]}'
-                backup_filename = f'{cs_row["database"]}.7z'
+                backup_filename = f'{cs_row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z';
+
+                logger.debug(f'Create backup {cs_row["host"]} / {cs_row["database"]} to {backup_filename}')
                 self.create_backup(connection_string, backup_filename)
+
+                logger.debug(f'Upload {backup_filename} to B2')
                 self.upload_to_b2(os.environ.get('B2_KEY_ID'), os.environ.get('B2_APP_KEY'),
                                   os.environ.get('B2_BUCKET'), backup_filename)
+                logger.info('Success')
 
 
     def create_backup(self, pg_conn_string: str, backup_filename: str):
@@ -52,7 +59,7 @@ class OrdersFromBc(BaseScript):
 
 
 if __name__ == '__main__':
-    script = OrdersFromBc('orders')
+    script = PgBak('PgBak')
     script.run()
 
 

@@ -7,6 +7,7 @@ name = "pypi"
 filelock = "*"
 asyncpg = "*"
 b2 = "*"
+logdna = "*"
 
 [dev-packages]
 
