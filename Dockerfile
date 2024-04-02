@@ -26,11 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
 RUN apt-get install -y --no-install-recommends python3.11-full python3-pip
-RUN python3.11 -m pip install pipenv && pipenv install --python 3.11
 
 WORKDIR /app
-
 COPY . .
+
+RUN python3.11 -m pip install pipenv && pipenv install --python 3.11
 
 CMD printenv > /etc/cron.d/cron && cat /app/crontab >> /etc/cron.d/cron && chmod 0644 /etc/cron.d/cron && crontab /etc/cron.d/cron && cron && rsyslogd && sleep 2 && tail -F /var/log/syslog
 
