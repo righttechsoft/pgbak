@@ -184,5 +184,7 @@ if __name__ == '__main__':
             command_add(conn)
         elif sys.argv[1]=='list':
             command_list(conn)
+        elif sys.argv[1]=='run':
+            run_backup(conn)
     else:
-        run_backup(conn)
+        print('Unknown command. Can be one of: run, add, list')
