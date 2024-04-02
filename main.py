@@ -2,16 +2,17 @@ import logging
 import os
 import sqlite3
 import subprocess
-from prompt_toolkit.validation import Validator, ValidationError
-from prompt_toolkit import prompt
 import sys
 import traceback
 from datetime import datetime
 from tempfile import TemporaryDirectory
-from tabulate import tabulate
+
 import b2sdk.v2 as b2
 import requests
 from logdna import LogDNAHandler
+from prompt_toolkit import prompt
+from prompt_toolkit.validation import Validator, ValidationError
+from tabulate import tabulate
 
 from single_instance_helper import SingleInstance
 
@@ -65,7 +66,8 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
         print(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
         exit(1)
 
-def run_backup(conn):
+
+def run_backup(conn, force=False):
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
         logger.debug(f'Created tmp dir {temp_dir}')
@@ -74,7 +76,7 @@ def run_backup(conn):
         c.close()
 
         for row in rows:
-            if row['last_backup']:
+            if row['last_backup'] and not force:
                 last_bak = datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
                 time_diff = datetime.utcnow() - last_bak
                 hours_diff = time_diff.total_seconds() / 3600
@@ -109,7 +111,6 @@ def run_backup(conn):
                 logger.error(f'Failed to backup {row["host"]} / {row["database"]}:\n{exc}')
 
 
-
 class NumberValidator(Validator):
     def validate(self, document):
         text = document.text
@@ -121,10 +122,13 @@ class NumberValidator(Validator):
 
             raise ValidationError(message='This input contains non-numeric characters',
                                   cursor_position=i)
+
+
 class NotEmptyValidator(Validator):
     def validate(self, document):
-        if document.text=='':
+        if document.text == '':
             raise ValidationError(message='Enter the value')
+
 
 def command_add(conn):
     host = prompt('host: ', validator=NotEmptyValidator())
@@ -148,25 +152,27 @@ def command_add(conn):
     conn.execute("""
     INSERT INTO servers (host, port, "database", "user", password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password) 
                   VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET,keep_last_files, archive_name, archive_password))
+    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password))
+
 
 def command_list(conn):
     c = conn.execute('SELECT * FROM servers')
     rows = c.fetchall()
     c.close()
-    if len(rows)==0:
+    if len(rows) == 0:
         print('Nothing here')
         return
     headers = list(rows[0].keys())
-   # rows = [list(d.values()) for d in rows]
+    # rows = [list(d.values()) for d in rows]
     table = tabulate(rows, headers, tablefmt="grid")
     print(table)
+
 
 if __name__ == '__main__':
     if not os.path.isfile('/usr/local/etc/pgback/backup.sqlite'):
         os.makedirs('/usr/local/etc/pgback/', exist_ok=True)
         conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
-        create_tables_script="""
+        create_tables_script = """
             CREATE TABLE servers (
                 id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 host TEXT NOT NULL,
@@ -194,11 +200,14 @@ if __name__ == '__main__':
         conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
     conn.row_factory = sqlite3.Row
     if len(sys.argv) > 1:
-        if sys.argv[1]=='add':
+        if sys.argv[1] == 'add':
             command_add(conn)
-        elif sys.argv[1]=='list':
+        elif sys.argv[1] == 'list':
             command_list(conn)
-        elif sys.argv[1]=='run':
-            run_backup(conn)
+        elif sys.argv[1] == 'run':
+            if len(sys.argv) > 2 and sys.argv[2] == '--force':
+                run_backup(conn, True)
+            else:
+                run_backup(conn)
     else:
         print('Unknown command. Can be one of: run, add, list')
