@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 b2 = "*"
 logdna = "*"
+prompt-toolkit = "*"
 
 [dev-packages]
 
