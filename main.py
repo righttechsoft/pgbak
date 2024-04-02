@@ -61,11 +61,12 @@ def run_backup(conn):
         c.close()
 
         for row in rows:
-            last_bak = datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
-            time_diff = datetime.utcnow() - last_bak
-            hours_diff = time_diff.total_seconds() / 3600
-            if hours_diff < row['frequency_hrs']:
-                continue
+            if row['last_backup']:
+                last_bak = datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
+                time_diff = datetime.utcnow() - last_bak
+                hours_diff = time_diff.total_seconds() / 3600
+                if hours_diff < row['frequency_hrs']:
+                    continue
             try:
                 connection_string = f'postgres://{row["user"]}:{row["password"]}@{row["host"]}:{row["port"]}/{row["database"]}'
                 backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
