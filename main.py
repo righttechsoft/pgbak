@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import sqlite3
@@ -168,7 +169,7 @@ def command_list(conn):
     print(table)
 
 
-if __name__ == '__main__':
+def create_db_connect() -> sqlite3.Connection:
     if not os.path.isfile('/usr/local/etc/pgback/backup.sqlite'):
         os.makedirs('/usr/local/etc/pgback/', exist_ok=True)
         conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
@@ -199,15 +200,24 @@ if __name__ == '__main__':
     else:
         conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
     conn.row_factory = sqlite3.Row
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'add':
+    return conn
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('command', type=str, choices=['add', 'list', 'run'])
+    parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
+
+    args = parser.parse_args()
+
+    conn: sqlite3.Connection = create_db_connect()
+
+    match args.command:
+        case 'add':
             command_add(conn)
-        elif sys.argv[1] == 'list':
+        case 'list':
             command_list(conn)
-        elif sys.argv[1] == 'run':
-            if len(sys.argv) > 2 and sys.argv[2] == '--force':
-                run_backup(conn, True)
-            else:
-                run_backup(conn)
-    else:
-        print('Unknown command. Can be one of: run, add, list')
+        case 'run':
+            run_backup(conn, args.force)
+
