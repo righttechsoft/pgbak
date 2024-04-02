@@ -24,7 +24,8 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-16
 
 RUN add-apt-repository ppa:deadsnakes/ppa
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC && apt-get install -y --no-install-recommends python3.11-full python3-pip
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends python3.11-full python3-pip
 RUN python3.11 -m pip install pipenv
 
 WORKDIR /app
