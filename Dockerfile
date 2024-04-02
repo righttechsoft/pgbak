@@ -21,11 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-RUN apt-get install -y --no-install-recommends postgresql-client-16
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-16
 
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
-RUN apt-get update && apt-get install -y --no-install-recommends python3.11-full python3-pip
+RUN apt-get install -y --no-install-recommends python3.11-full python3-pip
 RUN python3.11 -m pip install pipenv && pipenv install --python 3.11
 
 WORKDIR /app
