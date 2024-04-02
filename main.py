@@ -119,6 +119,7 @@ def command_add(conn):
     user = prompt('user: ', validator=NotEmptyValidator())
     password = prompt('password: ', validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', validator=NumberValidator()))
+    keep_last_files = int(prompt('keep_last_files: ', validator=NumberValidator()))
     dms_id = prompt('dms_id: ')
     dms_id = None if dms_id == '' else dms_id
     B2_KEY_ID = prompt('B2_KEY_ID: ')
@@ -127,12 +128,13 @@ def command_add(conn):
     B2_APP_KEY = None if B2_APP_KEY == '' else B2_APP_KEY
     B2_BUCKET = prompt('B2_BUCKET: ')
     B2_BUCKET = None if B2_BUCKET == '' else B2_BUCKET
+    archive_name = prompt('archive_name: ')
     archive_password = prompt('archive_password: ')
     archive_password = None if archive_password == '' else archive_password
     conn.execute("""
-    INSERT INTO servers (host, port, "database", "user", password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_password) 
-                  VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_password))
+    INSERT INTO servers (host, port, "database", "user", password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password) 
+                  VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET,keep_last_files, archive_name, archive_password))
 
 def command_list(conn):
     c = conn.execute('SELECT * FROM servers')
@@ -158,11 +160,13 @@ if __name__ == '__main__':
                 "database" TEXT NOT NULL,
                 "user" TEXT NOT NULL,
                 password TEXT NOT NULL,
-                frequency_hrs INTEGER DEFAULT (1) NOT NULL,
+                frequency_hrs INTEGER DEFAULT (1) NOT NULL,                
+                B2_KEY_ID TEXT, B2_APP_KEY TEXT, B2_BUCKET TEXT,
+                keep_last_files INTEGER, 
+                archive_name TEXT, archive_password TEXT,
+                dms_id TEXT,
                 last_backup TEXT,
-                last_backup_result TEXT,
-                dms_id TEXT
-            , B2_KEY_ID TEXT, B2_APP_KEY TEXT, B2_BUCKET TEXT, archive_password TEXT);
+                last_backup_result TEXT);
             CREATE TABLE backup_log (
                 server_id INTEGER NOT NULL,
                 ts TEXT NOT NULL,
