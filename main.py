@@ -18,7 +18,7 @@ from tabulate import tabulate
 from single_instance_helper import SingleInstance
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 options = {
     'app': 'pgbak',
@@ -32,6 +32,9 @@ logger.addHandler(log_handler)
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(logging.Formatter("[pgbak] %(levelname)s: %(message)s"))
 logger.addHandler(handler)
+
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("requests").setLevel(logging.ERROR)
 
 me = SingleInstance('pgbak')
 
@@ -56,6 +59,10 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
     seven_zip_command = f'7z a -si -p"{archive_password}" -mhe=on -mx=9 {backup_filename}'
 
     pg_dump_process = subprocess.Popen(pg_dump_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = pg_dump_process.communicate()
+    if err:
+        raise Exception(err.decode("utf-8"))
+
     seven_zip_process = subprocess.Popen(seven_zip_command, shell=True, stdin=pg_dump_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     pg_dump_process.stdout.close()
