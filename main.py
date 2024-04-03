@@ -59,20 +59,20 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
     seven_zip_command = f'7z a -si -p"{archive_password}" -mhe=on -mx=9 {backup_filename}'
 
     pg_dump_process = subprocess.Popen(pg_dump_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = pg_dump_process.communicate()
-    if err:
-        raise Exception(err.decode("utf-8"))
-
     seven_zip_process = subprocess.Popen(seven_zip_command, shell=True, stdin=pg_dump_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     pg_dump_process.stdout.close()
     seven_zip_stdout, seven_zip_stderr = seven_zip_process.communicate()
 
+    dumb_err = pg_dump_process.stderr.read().decode("utf-8")
+
+    if 'error' in dumb_err:
+        raise Exception(dumb_err)
+
     if seven_zip_process.returncode == 0:
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
     else:
-        print(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
-        exit(1)
+        raise Exception(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
 
 
 def run_backup(conn, force=False):
