@@ -184,12 +184,12 @@ def command_edit(conn):
 
 
     host = prompt('host: ', default=row['host'],validator=NotEmptyValidator())
-    port = int(prompt('port: ', default=row['port'], validator=NumberValidator()))
+    port = int(prompt('port: ', default=str(row['port']), validator=NumberValidator()))
     database = prompt('database: ', default=row['database'], validator=NotEmptyValidator())
     user = prompt('user: ', default=row['user'], validator=NotEmptyValidator())
     password = prompt('password: ', default=row['password'], validator=NotEmptyValidator())
-    frequency_hrs = int(prompt('frequency_hrs: ', default=row['frequency_hrs'], validator=NumberValidator()))
-    keep_last_files = int(prompt('keep_last_files: ', default=row['keep_last_files'], validator=NumberValidator()))
+    frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
+    keep_last_files = int(prompt('keep_last_files: ', default=str(row['keep_last_files']), validator=NumberValidator()))
     dms_id = prompt('dms_id: ', default=row['dms_id'])
     dms_id = None if dms_id == '' else dms_id
     B2_KEY_ID = prompt('B2_KEY_ID: ', default=row['B2_KEY_ID'])
