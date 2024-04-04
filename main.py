@@ -231,15 +231,29 @@ def command_edit(conn):
 
 
 def command_list(conn):
-    c = conn.execute('SELECT * FROM servers')
+    c = conn.execute('''
+            SELECT id,
+                   connection_string ,
+                   frequency_hrs ,                
+                   IFNULL(B2_KEY_ID,'') B2_KEY_ID, 
+                   IFNULL(B2_APP_KEY,'') B2_APP_KEY,
+                   IFNULL(B2_BUCKET ,'') B2_BUCKET,
+                   IFNULL(archive_name ,'') archive_name, 
+                   IFNULL(archive_password ,'') archive_password,
+                   IFNULL(dms_id ,'') dms_id,
+                   IFNULL(last_backup ,'') last_backup,
+                   IFNULL(last_backup_result,'') last_backup_result
+            FROM servers
+    ''')
     rows = c.fetchall()
     c.close()
     if len(rows) == 0:
         print('Nothing here')
         return
     headers = list(rows[0].keys())
-    clwdh = math.floor((200 - 3) / (len(headers) - 1))
-    maxcolwidths = [3] + [clwdh] * (len(headers) - 1)
+
+    clwdh = math.floor((200 - 3) / (len(headers) ))
+    maxcolwidths = [3] + [clwdh] * (len(headers) )
 
     table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=maxcolwidths)
     print(table)
