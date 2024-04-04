@@ -13,6 +13,7 @@ import requests
 from logdna import LogDNAHandler
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator, ValidationError
+from prompt_toolkit.shortcuts import radiolist_dialog
 from tabulate import tabulate
 
 from single_instance_helper import SingleInstance
@@ -162,6 +163,48 @@ def command_add(conn):
                   VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password))
 
+def command_edit(conn):
+    c = conn.execute('select id, host,"database" from servers')
+    rows = c.fetchall()
+    c.close()
+    values=list()
+    for row in rows:
+        value=(row['id'], f"{row['host']}/{row['database']}")
+        values.append(value)
+    result = radiolist_dialog(
+        title="Edit",
+        text="What database?",
+        values=values
+    ).run()
+    if not result:
+        return
+    c = conn.execute('select * from servers where id=?',(result))
+    row = c.fetchone()
+    c.close()
+
+
+    host = prompt('host: ', default=row['host'],validator=NotEmptyValidator())
+    port = int(prompt('port: ', default=row['port'], validator=NumberValidator()))
+    database = prompt('database: ', default=row['database'], validator=NotEmptyValidator())
+    user = prompt('user: ', default=row['user'], validator=NotEmptyValidator())
+    password = prompt('password: ', default=row['password'], validator=NotEmptyValidator())
+    frequency_hrs = int(prompt('frequency_hrs: ', default=row['frequency_hrs'], validator=NumberValidator()))
+    keep_last_files = int(prompt('keep_last_files: ', default=row['keep_last_files'], validator=NumberValidator()))
+    dms_id = prompt('dms_id: ', default=row['dms_id'])
+    dms_id = None if dms_id == '' else dms_id
+    B2_KEY_ID = prompt('B2_KEY_ID: ', default=row['B2_KEY_ID'])
+    B2_KEY_ID = None if B2_KEY_ID == '' else B2_KEY_ID
+    B2_APP_KEY = prompt('B2_APP_KEY: ', default=row['B2_APP_KEY'])
+    B2_APP_KEY = None if B2_APP_KEY == '' else B2_APP_KEY
+    B2_BUCKET = prompt('B2_BUCKET: ', default=row['B2_BUCKET'])
+    B2_BUCKET = None if B2_BUCKET == '' else B2_BUCKET
+    archive_name = prompt('archive_name: ', default=row['archive_name'])
+    archive_password = prompt('archive_password: ', default=row['archive_password'])
+    archive_password = None if archive_password == '' else archive_password
+    conn.execute("""
+    UPDATE servers SET host=?, port=?, "database"=?, "user"=?, password=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, keep_last_files=?, archive_name=?, archive_password=? 
+                  where id = ?
+    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password, row['id']))
 
 def command_list(conn):
     c = conn.execute('SELECT * FROM servers')
@@ -213,7 +256,7 @@ def create_db_connect() -> sqlite3.Connection:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('command', type=str, choices=['add', 'list', 'run'])
+    parser.add_argument('command', type=str, choices=['add', 'list', 'edit', 'run'])
     parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
 
     args = parser.parse_args()
@@ -223,6 +266,8 @@ if __name__ == '__main__':
     match args.command:
         case 'add':
             command_add(conn)
+        case 'edit':
+            command_edit(conn)
         case 'list':
             command_list(conn)
         case 'run':
