@@ -113,18 +113,19 @@ def run_backup(conn, force=False):
             try:
                 connection_string = row['connection_string']
                 #backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
+                backup_filename = f'{row["archive_name"]}.7z'
                 conn_details=parse_postgres_connection_string(connection_string)
 
-                logger.info(f'Creating backup {conn_details["host"]}/{conn_details["database"]} to {row["archive_name"]}')
+                logger.info(f'Creating backup {conn_details["host"]}/{conn_details["database"]} to {backup_filename}')
                 archive_password = row['archive_password'] if row['archive_password'] else os.environ.get('ARCHIVE_PASSWORD')
-                create_backup(connection_string, row["archive_name"], archive_password)
-                filesize = os.path.getsize(row["archive_name"])
+                create_backup(connection_string, backup_filename, archive_password)
+                filesize = os.path.getsize(backup_filename)
 
-                logger.info(f'Uploading {row["archive_name"]} to B2')
+                logger.info(f'Uploading {backup_filename} to B2')
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
                 b2_app_key = row['B2_APP_KEY'] if row['B2_APP_KEY'] else os.environ.get('B2_APP_KEY')
                 b2_bucket = row['B2_BUCKET'] if row['B2_BUCKET'] else os.environ.get('B2_BUCKET')
-                uploaded_file = upload_to_b2(b2_key_id, b2_app_key, b2_bucket, row["archive_name"])
+                uploaded_file = upload_to_b2(b2_key_id, b2_app_key, b2_bucket, backup_filename)
                 logger.info(f'Success {uploaded_file=}')
 
                 conn.execute("""
@@ -234,7 +235,7 @@ def command_list(conn):
         print('Nothing here')
         return
     headers = list(rows[0].keys())
-    table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=[20])
+    table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=[4, 10, 10, 10, 10, 10])
     print(table)
 
 
