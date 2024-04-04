@@ -17,6 +17,9 @@ from prompt_toolkit.shortcuts import radiolist_dialog
 from tabulate import tabulate
 
 from single_instance_helper import SingleInstance
+from urllib.parse import urlparse
+
+
 
 me = SingleInstance('pgbak')
 
@@ -39,6 +42,18 @@ logger.addHandler(handler)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 
+def parse_postgres_connection_string(connection_string):
+    result = {}
+    parsed = urlparse(connection_string)
+
+    result['scheme'] = parsed.scheme
+    result['username'] = parsed.username
+    result['password'] = parsed.password
+    result['host'] = parsed.hostname
+    result['port'] = parsed.port
+    result['database'] = parsed.path[1:]
+
+    return result
 
 def upload_to_b2(b2_key_id: str, b2_app_key: str, b2_bucket: str, backup_filename: str):
     info = b2.InMemoryAccountInfo()
@@ -92,10 +107,10 @@ def run_backup(conn, force=False):
                 if hours_diff < row['frequency_hrs']:
                     continue
             try:
-                connection_string = f'postgres://{row["user"]}:{row["password"]}@{row["host"]}:{row["port"]}/{row["database"]}'
+                connection_string = row['connection_string']#f'postgres://{row["user"]}:{row["password"]}@{row["host"]}:{row["port"]}/{row["database"]}'
                 backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
-
-                logger.info(f'Create backup {row["host"]} / {row["database"]} to {backup_filename}')
+                conn_details=parse_postgres_connection_string(connection_string)
+                logger.info(f'Create backup {conn_details["host"]} / {conn_details["database"]} to {backup_filename}')
                 archive_password = row['archive_password'] if row['archive_password'] else os.environ.get('ARCHIVE_PASSWORD')
                 create_backup(connection_string, backup_filename, archive_password)
                 filesize = os.path.getsize(backup_filename)
@@ -117,7 +132,7 @@ def run_backup(conn, force=False):
                 conn.execute("""
                 INSERT INTO backup_log (server_id, ts, "result", success) VALUES(?, ?, ?, '0')
                 """, (row['id'], datetime.utcnow().strftime("%Y%m%dT%H%M%S"), exc))
-                logger.error(f'Failed to backup {row["host"]} / {row["database"]}:\n{exc}')
+                logger.error(f'Failed to backup {conn_details["host"]} / {conn_details["database"]}:\n{exc}')
 
 
 class NumberValidator(Validator):
@@ -140,11 +155,12 @@ class NotEmptyValidator(Validator):
 
 
 def command_add(conn):
-    host = prompt('host: ', validator=NotEmptyValidator())
-    port = int(prompt('port: ', default='5432', validator=NumberValidator()))
-    database = prompt('database: ', validator=NotEmptyValidator())
-    user = prompt('user: ', validator=NotEmptyValidator())
-    password = prompt('password: ', validator=NotEmptyValidator())
+    connection_string = prompt('connection_string: ', validator=NotEmptyValidator())
+    # host = prompt('host: ', validator=NotEmptyValidator())
+    # port = int(prompt('port: ', default='5432', validator=NumberValidator()))
+    # database = prompt('database: ', validator=NotEmptyValidator())
+    # user = prompt('user: ', validator=NotEmptyValidator())
+    # password = prompt('password: ', validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', validator=NumberValidator()))
     keep_last_files = int(prompt('keep_last_files: ', validator=NumberValidator()))
     dms_id = prompt('dms_id: ')
@@ -159,17 +175,21 @@ def command_add(conn):
     archive_password = prompt('archive_password: ')
     archive_password = None if archive_password == '' else archive_password
     conn.execute("""
-    INSERT INTO servers (host, port, "database", "user", password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password) 
-                  VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password))
+    --INSERT INTO servers (host, port, "database", "user", password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password) 
+    INSERT INTO servers (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password) 
+                  VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+                 (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password))
+                 #(host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password))
 
 def command_edit(conn):
-    c = conn.execute('select id, host,"database" from servers')
+    c = conn.execute('select id, connection_string from servers')
     rows = c.fetchall()
     c.close()
     values=list()
     for row in rows:
-        value=(row['id'], f"{row['host']}/{row['database']}")
+        conn_details = parse_postgres_connection_string(row['connection_string'])
+        value=(row['id'], f"{conn_details['host']}/{conn_details['database']}")
         values.append(value)
     result = radiolist_dialog(
         title="Edit",
@@ -183,11 +203,12 @@ def command_edit(conn):
     c.close()
 
 
-    host = prompt('host: ', default=row['host'],validator=NotEmptyValidator())
-    port = int(prompt('port: ', default=str(row['port']), validator=NumberValidator()))
-    database = prompt('database: ', default=row['database'], validator=NotEmptyValidator())
-    user = prompt('user: ', default=row['user'], validator=NotEmptyValidator())
-    password = prompt('password: ', default=row['password'], validator=NotEmptyValidator())
+    connection_string = prompt('connection_string: ', default=row['connection_string'],validator=NotEmptyValidator())
+    #host = prompt('host: ', default=row['host'],validator=NotEmptyValidator())
+    #port = int(prompt('port: ', default=str(row['port']), validator=NumberValidator()))
+    #database = prompt('database: ', default=row['database'], validator=NotEmptyValidator())
+    #user = prompt('user: ', default=row['user'], validator=NotEmptyValidator())
+    #password = prompt('password: ', default=row['password'], validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
     keep_last_files = int(prompt('keep_last_files: ', default=str(row['keep_last_files']), validator=NumberValidator()))
     dms_id = prompt('dms_id: ', default=row['dms_id'] if row['dms_id'] else '')
@@ -202,9 +223,11 @@ def command_edit(conn):
     archive_password = prompt('archive_password: ', default=row['archive_password'] if row['archive_password'] else '')
     archive_password = None if archive_password == '' else archive_password
     conn.execute("""
-    UPDATE servers SET host=?, port=?, "database"=?, "user"=?, password=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, keep_last_files=?, archive_name=?, archive_password=? 
+    --UPDATE servers SET host=?, port=?, "database"=?, "user"=?, password=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, keep_last_files=?, archive_name=?, archive_password=? 
+    UPDATE servers SET connection_string=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, keep_last_files=?, archive_name=?, archive_password=? 
                   where id = ?
-    """, (host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password, row['id']))
+    --(host, port, database, user, password, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password, row['id']))
+    """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, keep_last_files, archive_name, archive_password, row['id']))
 
 def command_list(conn):
     c = conn.execute('SELECT * FROM servers')
@@ -226,11 +249,12 @@ def create_db_connect() -> sqlite3.Connection:
         create_tables_script = """
             CREATE TABLE servers (
                 id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                host TEXT NOT NULL,
-                port INTEGER DEFAULT (5432) NOT NULL,
-                "database" TEXT NOT NULL,
-                "user" TEXT NOT NULL,
-                password TEXT NOT NULL,
+                --host TEXT NOT NULL,
+                --port INTEGER DEFAULT (5432) NOT NULL,
+                --"database" TEXT NOT NULL,
+                --"user" TEXT NOT NULL,
+                --password TEXT NOT NULL,
+                connection_string TEXT,
                 frequency_hrs INTEGER DEFAULT (1) NOT NULL,                
                 B2_KEY_ID TEXT, B2_APP_KEY TEXT, B2_BUCKET TEXT,
                 keep_last_files INTEGER, 
