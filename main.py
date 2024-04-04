@@ -192,19 +192,7 @@ def command_add(conn):
 
 
 def command_edit(conn):
-    c = conn.execute('select id, connection_string from servers')
-    rows = c.fetchall()
-    c.close()
-    values = list()
-    for row in rows:
-        conn_details = parse_postgres_connection_string(row['connection_string'])
-        value = (row['id'], f"{conn_details['host']}/{conn_details['database']}")
-        values.append(value)
-    result = radiolist_dialog(
-        title="Edit",
-        text="What database?",
-        values=values
-    ).run()
+    result = ask_for_database(conn)
     if not result:
         return
     c = conn.execute('select * from servers where id=?', (result,))
@@ -230,6 +218,23 @@ def command_edit(conn):
     """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, row['id']))
 
 
+def ask_for_database(conn):
+    c = conn.execute('select id, connection_string from servers')
+    rows = c.fetchall()
+    c.close()
+    values = list()
+    for row in rows:
+        conn_details = parse_postgres_connection_string(row['connection_string'])
+        value = (row['id'], f"{conn_details['host']}/{conn_details['database']}")
+        values.append(value)
+    result = radiolist_dialog(
+        title="Edit",
+        text="What database?",
+        values=values
+    ).run()
+    return result
+
+
 def command_list(conn):
     c = conn.execute('''
             SELECT id,
@@ -252,10 +257,32 @@ def command_list(conn):
         return
     headers = list(rows[0].keys())
 
-    clwdh = math.floor((200 - 3) / (len(headers) ))
-    maxcolwidths = [3] + [clwdh] * (len(headers) )
+    clwdh = math.floor((200 - 3) / (len(headers)))
+    maxcolwidths = [3] + [clwdh] * (len(headers))
 
-    table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=maxcolwidths)
+    table = tabulate(rows, headers, tablefmt="heavy_grid", maxcolwidths=maxcolwidths)
+    print(table)
+
+
+def command_logs(conn):
+    result = ask_for_database(conn)
+    if not result:
+        return
+    c = conn.execute("""
+    select server_id,ts,"result",ifnull(file_size,'') file_size,success from backup_log where server_id=? order by ts desc
+    """, (result,))
+    rows = c.fetchall()
+    c.close()
+
+    if len(rows) == 0:
+        print('Nothing here')
+        return
+    headers = list(rows[0].keys())
+
+    clwdh = math.floor((200) / len(headers))
+    maxcolwidths = [clwdh] * (len(headers))
+
+    table = tabulate(rows, headers, tablefmt="heavy_grid", missingval='', maxcolwidths=maxcolwidths)
     print(table)
 
 
@@ -291,7 +318,7 @@ def create_db_connection() -> sqlite3.Connection:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('command', type=str, choices=['add', 'list', 'edit', 'run'])
+    parser.add_argument('command', type=str, choices=['add', 'list', 'logs', 'edit', 'run'])
     parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
 
     args = parser.parse_args()
@@ -305,5 +332,7 @@ if __name__ == '__main__':
             command_edit(conn)
         case 'list':
             command_list(conn)
+        case 'logs':
+            command_logs(conn)
         case 'run':
             run_backup(conn, args.force)
