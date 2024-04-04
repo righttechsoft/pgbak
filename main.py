@@ -17,6 +17,8 @@ from tabulate import tabulate
 
 from single_instance_helper import SingleInstance
 
+me = SingleInstance('pgbak')
+
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -35,8 +37,6 @@ logger.addHandler(handler)
 
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
-
-me = SingleInstance('pgbak')
 
 
 def upload_to_b2(b2_key_id: str, b2_app_key: str, b2_bucket: str, backup_filename: str):
@@ -227,4 +227,3 @@ if __name__ == '__main__':
             command_list(conn)
         case 'run':
             run_backup(conn, args.force)
-
