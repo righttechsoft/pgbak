@@ -119,7 +119,7 @@ def run_backup(conn, force=False):
                 b2_app_key = row['B2_APP_KEY'] if row['B2_APP_KEY'] else os.environ.get('B2_APP_KEY')
                 b2_bucket = row['B2_BUCKET'] if row['B2_BUCKET'] else os.environ.get('B2_BUCKET')
                 uploaded_file = upload_to_b2(b2_key_id, b2_app_key, b2_bucket, backup_filename)
-                logger.info('Success')
+                logger.info(f'Success {uploaded_file=}')
 
                 conn.execute("""
                 INSERT INTO backup_log (server_id, ts, "result", file_size) VALUES(?, ?, 'Success', ?)
