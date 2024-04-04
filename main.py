@@ -1,5 +1,6 @@
 import argparse
 import logging
+import math
 import os
 import sqlite3
 import subprocess
@@ -7,31 +8,30 @@ import sys
 import traceback
 from datetime import datetime
 from tempfile import TemporaryDirectory
+from urllib.parse import urlparse
 
 import b2sdk.v2 as b2
 import requests
 from prompt_toolkit import prompt
-from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.shortcuts import radiolist_dialog
+from prompt_toolkit.validation import Validator, ValidationError
 from tabulate import tabulate
 
 from single_instance_helper import SingleInstance
-from urllib.parse import urlparse
-
-
 
 me = SingleInstance('pgbak')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
 MEZMO_INGESTION_KEY = os.environ['MEZMO_INGESTION_KEY']
 if MEZMO_INGESTION_KEY:
     from logdna import LogDNAHandler
+
     hostname = os.getenv('LOG_HOSTNAME')
     if not hostname:
         import socket
+
         hostname = socket.gethostname()
 
     options = {
@@ -49,6 +49,7 @@ if MEZMO_INGESTION_KEY:
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
 
+
 def parse_postgres_connection_string(connection_string):
     result = {}
     parsed = urlparse(connection_string)
@@ -61,6 +62,7 @@ def parse_postgres_connection_string(connection_string):
     result['database'] = parsed.path[1:]
 
     return result
+
 
 def upload_to_b2(b2_key_id: str, b2_app_key: str, b2_bucket: str, backup_filename: str):
     info = b2.InMemoryAccountInfo()
@@ -112,9 +114,9 @@ def run_backup(conn, force=False):
                     continue
             try:
                 connection_string = row['connection_string']
-                #backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
+                # backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
                 backup_filename = f'{row["archive_name"]}.7z'
-                conn_details=parse_postgres_connection_string(connection_string)
+                conn_details = parse_postgres_connection_string(connection_string)
 
                 logger.info(f'Creating backup {conn_details["host"]}/{conn_details["database"]} to {backup_filename}')
                 archive_password = row['archive_password'] if row['archive_password'] else os.environ.get('ARCHIVE_PASSWORD')
@@ -135,11 +137,11 @@ def run_backup(conn, force=False):
                 if row['dms_id']:
                     requests.post(f"https://nosnch.in/{row['dms_id']}", data={"m": uploaded_file})
 
-                c = conn.execute('SELECT file_size FROM backup_log bl WHERE server_id=? ORDER BY ts DESC LIMIT 1',(row['id'],))
+                c = conn.execute('SELECT file_size FROM backup_log bl WHERE server_id=? ORDER BY ts DESC LIMIT 1', (row['id'],))
                 prev = c.fetchone()
                 c.close()
                 diff = abs(prev['file_size'] - filesize) / ((prev['file_size'] + filesize) / 2) * 100
-                if diff>10:
+                if diff > 10:
                     logger.error(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev["file_size"]}, now: {filesize}')
             except:
                 exc = traceback.format_exc()
@@ -188,14 +190,15 @@ def command_add(conn):
     """,
                  (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password))
 
+
 def command_edit(conn):
     c = conn.execute('select id, connection_string from servers')
     rows = c.fetchall()
     c.close()
-    values=list()
+    values = list()
     for row in rows:
         conn_details = parse_postgres_connection_string(row['connection_string'])
-        value=(row['id'], f"{conn_details['host']}/{conn_details['database']}")
+        value = (row['id'], f"{conn_details['host']}/{conn_details['database']}")
         values.append(value)
     result = radiolist_dialog(
         title="Edit",
@@ -204,12 +207,11 @@ def command_edit(conn):
     ).run()
     if not result:
         return
-    c = conn.execute('select * from servers where id=?',(result, ))
+    c = conn.execute('select * from servers where id=?', (result,))
     row = c.fetchone()
     c.close()
 
-
-    connection_string = prompt('connection_string: ', default=row['connection_string'],validator=NotEmptyValidator())
+    connection_string = prompt('connection_string: ', default=row['connection_string'], validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
     dms_id = prompt('dms_id: ', default=row['dms_id'] if row['dms_id'] else '')
     dms_id = None if dms_id == '' else dms_id
@@ -227,6 +229,7 @@ def command_edit(conn):
                   where id = ?
     """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, row['id']))
 
+
 def command_list(conn):
     c = conn.execute('SELECT * FROM servers')
     rows = c.fetchall()
@@ -235,7 +238,10 @@ def command_list(conn):
         print('Nothing here')
         return
     headers = list(rows[0].keys())
-    table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=[4, 10, 10, 10, 10, 10])
+    clwdh = math.floor((200 - 3) / (len(headers) - 1))
+    maxcolwidths = [3] + [clwdh] * (len(headers) - 1)
+
+    table = tabulate(rows, headers, tablefmt="grid", maxcolwidths=maxcolwidths)
     print(table)
 
 
