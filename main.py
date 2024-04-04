@@ -21,7 +21,7 @@ from single_instance_helper import SingleInstance
 me = SingleInstance('pgbak')
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 options = {
     'app': 'pgbak',
@@ -95,11 +95,11 @@ def run_backup(conn, force=False):
                 connection_string = f'postgres://{row["user"]}:{row["password"]}@{row["host"]}:{row["port"]}/{row["database"]}'
                 backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
 
-                logger.debug(f'Create backup {row["host"]} / {row["database"]} to {backup_filename}')
+                logger.info(f'Create backup {row["host"]} / {row["database"]} to {backup_filename}')
                 archive_password = row['archive_password'] if row['archive_password'] else os.environ.get('ARCHIVE_PASSWORD')
                 create_backup(connection_string, backup_filename, archive_password)
                 filesize = os.path.getsize(backup_filename)
-                logger.debug(f'Upload {backup_filename} to B2')
+                logger.info(f'Upload {backup_filename} to B2')
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
                 b2_app_key = row['B2_APP_KEY'] if row['B2_APP_KEY'] else os.environ.get('B2_APP_KEY')
                 b2_bucket = row['B2_BUCKET'] if row['B2_BUCKET'] else os.environ.get('B2_BUCKET')
@@ -190,16 +190,16 @@ def command_edit(conn):
     password = prompt('password: ', default=row['password'], validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
     keep_last_files = int(prompt('keep_last_files: ', default=str(row['keep_last_files']), validator=NumberValidator()))
-    dms_id = prompt('dms_id: ', default=row['dms_id'])
+    dms_id = prompt('dms_id: ', default=row['dms_id'] if row['dms_id'] else '')
     dms_id = None if dms_id == '' else dms_id
-    B2_KEY_ID = prompt('B2_KEY_ID: ', default=row['B2_KEY_ID'])
+    B2_KEY_ID = prompt('B2_KEY_ID: ', default=row['B2_KEY_ID'] if row['B2_KEY_ID'] else '')
     B2_KEY_ID = None if B2_KEY_ID == '' else B2_KEY_ID
-    B2_APP_KEY = prompt('B2_APP_KEY: ', default=row['B2_APP_KEY'])
+    B2_APP_KEY = prompt('B2_APP_KEY: ', default=row['B2_APP_KEY'] if row['B2_APP_KEY'] else '')
     B2_APP_KEY = None if B2_APP_KEY == '' else B2_APP_KEY
-    B2_BUCKET = prompt('B2_BUCKET: ', default=row['B2_BUCKET'])
+    B2_BUCKET = prompt('B2_BUCKET: ', default=row['B2_BUCKET'] if row['B2_BUCKET'] else '')
     B2_BUCKET = None if B2_BUCKET == '' else B2_BUCKET
     archive_name = prompt('archive_name: ', default=row['archive_name'])
-    archive_password = prompt('archive_password: ', default=row['archive_password'])
+    archive_password = prompt('archive_password: ', default=row['archive_password'] if row['archive_password'] else '')
     archive_password = None if archive_password == '' else archive_password
     conn.execute("""
     UPDATE servers SET host=?, port=?, "database"=?, "user"=?, password=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, keep_last_files=?, archive_name=?, archive_password=? 
