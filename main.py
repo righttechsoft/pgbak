@@ -178,7 +178,7 @@ def command_edit(conn):
     ).run()
     if not result:
         return
-    c = conn.execute('select * from servers where id=?',(result))
+    c = conn.execute('select * from servers where id=?',(result, ))
     row = c.fetchone()
     c.close()
 
