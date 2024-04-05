@@ -269,7 +269,7 @@ def command_logs(conn):
     if not result:
         return
     c = conn.execute("""
-    select server_id,ts,"result",ifnull(file_size,'') file_size,success from backup_log where server_id=? order by ts desc
+    select ts,"result",ifnull(file_size,'') file_size,success from backup_log where server_id=? order by ts desc
     """, (result,))
     rows = c.fetchall()
     c.close()
