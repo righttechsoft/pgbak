@@ -7,6 +7,7 @@ name = "pypi"
 b2 = "*"
 logdna = "*"
 prompt-toolkit = "*"
+idna = ">=3.7"
 
 [dev-packages]
 
