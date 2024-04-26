@@ -97,11 +97,14 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
         raise Exception(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
 
 
-def run_backup(conn, force=False):
+def run_backup(conn, force=False, server_id=None):
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
         logger.debug(f'Created tmp dir {temp_dir}')
-        c = conn.execute('SELECT * FROM servers')
+        sql='SELECT * FROM servers'
+        if server_id:
+            sql.=f' WHERE id = {server_id}'
+        c = conn.execute(sql)
         rows = c.fetchall()
         c.close()
 
@@ -320,6 +323,7 @@ if __name__ == '__main__':
 
     parser.add_argument('command', type=str, choices=['add', 'list', 'logs', 'edit', 'run'])
     parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
+    parser.add_argument('--server', type=int, nargs='?', default=False, const=True)
 
     args = parser.parse_args()
 
@@ -335,4 +339,4 @@ if __name__ == '__main__':
         case 'logs':
             command_logs(conn)
         case 'run':
-            run_backup(conn, args.force)
+            run_backup(conn, args.force, args.server)
