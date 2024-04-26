@@ -101,9 +101,9 @@ def run_backup(conn, force=False, server_id=None):
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
         logger.debug(f'Created tmp dir {temp_dir}')
-        sql='SELECT * FROM servers'
+        sql = 'SELECT * FROM servers'
         if server_id:
-            sql.=f' WHERE id = {server_id}'
+            sql += f' WHERE id = {server_id}'
         c = conn.execute(sql)
         rows = c.fetchall()
         c.close()
