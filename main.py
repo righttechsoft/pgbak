@@ -6,7 +6,7 @@ import sqlite3
 import subprocess
 import sys
 import traceback
-from datetime import datetime
+import datetime
 from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
@@ -110,8 +110,8 @@ def run_backup(conn, force=False, server_id=None):
 
         for row in rows:
             if row['last_backup'] and not force:
-                last_bak = datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
-                time_diff = datetime.utcnow() - last_bak
+                last_bak = datetime.datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
+                time_diff = datetime.datetime.utcnow() - last_bak
                 hours_diff = time_diff.total_seconds() / 3600
                 if hours_diff < row['frequency_hrs']:
                     continue
@@ -135,8 +135,8 @@ def run_backup(conn, force=False, server_id=None):
 
                 conn.execute("""
                 INSERT INTO backup_log (server_id, ts, "result", file_size) VALUES(?, ?, 'Success', ?)
-                """, (row['id'], datetime.utcnow().strftime("%Y%m%dT%H%M%S"), filesize))
-                conn.execute("UPDATE servers SET last_backup=?, last_backup_result='Success' WHERE id=?", (datetime.utcnow().strftime("%Y%m%dT%H%M%S"), row['id']))
+                """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), filesize))
+                conn.execute("UPDATE servers SET last_backup=?, last_backup_result='Success' WHERE id=?", (datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), row['id']))
                 if row['dms_id']:
                     requests.post(f"https://nosnch.in/{row['dms_id']}", data={"m": uploaded_file})
 
@@ -150,7 +150,7 @@ def run_backup(conn, force=False, server_id=None):
                 exc = traceback.format_exc()
                 conn.execute("""
                 INSERT INTO backup_log (server_id, ts, "result", success) VALUES(?, ?, ?, '0')
-                """, (row['id'], datetime.utcnow().strftime("%Y%m%dT%H%M%S"), exc))
+                """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), exc))
                 logger.error(f'Failed to backup {conn_details["host"]} / {conn_details["database"]}:\n{exc}')
 
 
