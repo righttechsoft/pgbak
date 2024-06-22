@@ -50,6 +50,23 @@ if MEZMO_INGESTION_KEY:
     logging.getLogger("requests").setLevel(logging.ERROR)
 
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+def handle_error(func):
+    def __inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            handle_exception(exc_type, exc_value, exc_tb)
+
+    return __inner
+
+sys.excepthook = handle_exception
+
 def parse_postgres_connection_string(connection_string):
     result = {}
     parsed = urlparse(connection_string)
@@ -95,7 +112,6 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
     else:
         raise Exception(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
-
 
 def run_backup(conn, force=False, server_id=None):
     with TemporaryDirectory() as temp_dir:
