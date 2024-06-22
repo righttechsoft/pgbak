@@ -16,7 +16,6 @@ from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.validation import Validator, ValidationError
 from tabulate import tabulate
-
 from single_instance_helper import SingleInstance
 
 me = SingleInstance('pgbak')
@@ -127,7 +126,9 @@ def run_backup(conn, force=False, server_id=None):
         for row in rows:
             if row['last_backup'] and not force:
                 last_bak = datetime.datetime.strptime(row['last_backup'], '%Y%m%dT%H%M%S')
-                time_diff = datetime.datetime.now(datetime.UTC) - last_bak
+                last_bak_utc = last_bak.replace(tzinfo=datetime.UTC)
+                now_utc = datetime.datetime.now(datetime.UTC)
+                time_diff = now_utc - last_bak_utc
                 hours_diff = time_diff.total_seconds() / 3600
                 if hours_diff < row['frequency_hrs']:
                     continue
