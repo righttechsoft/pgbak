@@ -102,11 +102,6 @@ def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
     pg_dump_process.stdout.close()
     _, seven_zip_stderr = seven_zip_process.communicate()
 
-    dumb_err = pg_dump_process.stderr.read().decode("utf-8")
-
-    if 'error' in dumb_err:
-        raise Exception(dumb_err)
-
     if seven_zip_process.returncode == 0:
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
     else:
