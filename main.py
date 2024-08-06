@@ -94,7 +94,7 @@ def upload_to_b2(b2_key_id: str, b2_app_key: str, b2_bucket: str, backup_filenam
 
 def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
     pg_dump_command = f'pg_dump -d {pg_conn_string} -F c -b -v'
-    seven_zip_command = f'7z a -si -p"{archive_password}" -mhe=on -md=32m -ms=off -mx=9 {backup_filename}'
+    seven_zip_command = f'7z a -si -p"{archive_password}" -mhe=on -md=1m -ms=off -mx=1 -mm=LZMA2 -mmt=1 {backup_filename}'
 
     pg_dump_process = subprocess.Popen(pg_dump_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     seven_zip_process = subprocess.Popen(seven_zip_command, shell=True, stdin=pg_dump_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
