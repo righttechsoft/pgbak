@@ -168,6 +168,9 @@ def run_backup(conn, force=False, server_id=None):
                 if hours_diff < row['frequency_hrs']:
                     continue
             try:
+                if row['dms_id']:
+                    requests.post(f"{row['dms_id']}/start")
+
                 connection_string = row['connection_string']
                 # backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
                 backup_filename = f'{row["archive_name"]}.7z'
@@ -190,7 +193,7 @@ def run_backup(conn, force=False, server_id=None):
                 """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), filesize))
                 conn.execute("UPDATE servers SET last_backup=?, last_backup_result='Success' WHERE id=?", (datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), row['id']))
                 if row['dms_id']:
-                    requests.post(f"https://nosnch.in/{row['dms_id']}", data={"m": uploaded_file})
+                    requests.post(f"{row['dms_id']}")
 
                 c = conn.execute('SELECT file_size FROM backup_log bl WHERE server_id=? ORDER BY ts DESC LIMIT 1', (row['id'],))
                 prev = c.fetchone()
