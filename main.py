@@ -139,8 +139,9 @@ def create_backup(
     pg_dump_stderr = pg_dump_process.stderr.read()
     _, seven_zip_stderr = seven_zip_process.communicate()
 
-    if pg_dump_process.returncode != 0:
-        raise Exception(f'Error occurred during database dump:\n{pg_dump_stderr.decode("utf-8")}')
+#    if pg_dump_process.returncode != 0:
+#        err = pg_dump_stderr.decode("utf-8")
+#        raise Exception(f'Error occurred during database dump:\n{err}')
 
     if seven_zip_process.returncode == 0:
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
