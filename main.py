@@ -92,15 +92,55 @@ def upload_to_b2(b2_key_id: str, b2_app_key: str, b2_bucket: str, backup_filenam
     return uploaded_file
 
 
-def create_backup(pg_conn_string: str, backup_filename: str, archive_password):
-    pg_dump_command = f'pg_dump -d {pg_conn_string} -F c -b -v'
-    seven_zip_command = f'7z a -si -p"{archive_password}" -mhe=on -md=1m -ms=off -mx=1 -mm=LZMA2 -mmt=1 {backup_filename}'
+from typing import Optional, List
+import subprocess
+import logging
 
-    pg_dump_process = subprocess.Popen(pg_dump_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    seven_zip_process = subprocess.Popen(seven_zip_command, shell=True, stdin=pg_dump_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+logger = logging.getLogger(__name__)
+
+
+def create_backup(
+        pg_conn_string: str,
+        backup_filename: str,
+        archive_password: str,
+        exclude_tables: Optional[List[str]] = None
+):
+    pg_dump_command = f'pg_dump -d {pg_conn_string} -F c -b -v'
+
+    if exclude_tables:
+        cleaned_tables = [table.strip() for table in exclude_tables if table.strip()]
+        if cleaned_tables:
+            exclusion_params = ' '.join(f'--exclude-table="{table}"' for table in cleaned_tables)
+            pg_dump_command = f'{pg_dump_command} {exclusion_params}'
+            logger.info(f'Excluding tables from backup: {", ".join(cleaned_tables)}')
+
+    seven_zip_command = (
+        f'7z a -si -p"{archive_password}" -mhe=on -md=1m -ms=off '
+        f'-mx=1 -mm=LZMA2 -mmt=1 {backup_filename}'
+    )
+
+    pg_dump_process = subprocess.Popen(
+        pg_dump_command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    seven_zip_process = subprocess.Popen(
+        seven_zip_command,
+        shell=True,
+        stdin=pg_dump_process.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
 
     pg_dump_process.stdout.close()
+
+    pg_dump_stderr = pg_dump_process.stderr.read()
     _, seven_zip_stderr = seven_zip_process.communicate()
+
+    if pg_dump_process.returncode != 0:
+        raise Exception(f'Error occurred during database dump:\n{pg_dump_stderr.decode("utf-8")}')
 
     if seven_zip_process.returncode == 0:
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
