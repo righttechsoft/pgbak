@@ -185,6 +185,10 @@ def run_backup(conn, force=False, server_id=None):
                 create_backup(connection_string, backup_filename, archive_password)
                 filesize = os.path.getsize(backup_filename)
 
+                if filesize<4096:
+                    raise Exception(f'Archive file is too small: {filesize}')
+
+
                 logger.info(f'Uploading {backup_filename} to B2')
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
                 b2_app_key = row['B2_APP_KEY'] if row['B2_APP_KEY'] else os.environ.get('B2_APP_KEY')
@@ -196,21 +200,24 @@ def run_backup(conn, force=False, server_id=None):
                 INSERT INTO backup_log (server_id, ts, "result", file_size) VALUES(?, ?, 'Success', ?)
                 """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), filesize))
                 conn.execute("UPDATE servers SET last_backup=?, last_backup_result='Success' WHERE id=?", (datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), row['id']))
-                if row['dms_id']:
-                    requests.post(f"{row['dms_id']}")
 
                 c = conn.execute('SELECT file_size FROM backup_log bl WHERE server_id=? ORDER BY ts DESC LIMIT 1', (row['id'],))
                 prev = c.fetchone()
                 c.close()
                 diff = abs(prev['file_size'] - filesize) / ((prev['file_size'] + filesize) / 2) * 100
                 if diff > 10:
-                    logger.error(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev["file_size"]}, now: {filesize}')
+                    raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev["file_size"]}, now: {filesize}')
+
+                if row['dms_id']:
+                    requests.post(f"{row['dms_id']}")
+
             except:
                 exc = traceback.format_exc()
                 conn.execute("""
                 INSERT INTO backup_log (server_id, ts, "result", success) VALUES(?, ?, ?, '0')
                 """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), exc))
                 logger.error(f'Failed to backup {conn_details["host"]} / {conn_details["database"]}:\n{exc}')
+                requests.post(f"{row['dms_id']}/fail")
 
 
 class NumberValidator(Validator):
