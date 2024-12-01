@@ -3,7 +3,7 @@ import logging
 import math
 import os
 import sqlite3
-import subprocess
+import time
 import sys
 import traceback
 import datetime
@@ -173,7 +173,15 @@ def run_backup(conn, force=False, server_id=None):
                     continue
             try:
                 if row['dms_id']:
-                    requests.post(f"{row['dms_id']}/start")
+                    try:
+                        requests.post(f"{row['dms_id']}/start")
+                    except Exception:
+                        time.sleep(5)
+                        try:
+                            requests.post(f"{row['dms_id']}/start")
+                        except Exception:
+                            time.sleep(50)
+                            requests.post(f"{row['dms_id']}/start")
 
                 connection_string = row['connection_string']
                 # backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
@@ -209,7 +217,15 @@ def run_backup(conn, force=False, server_id=None):
                     raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev["file_size"]}, now: {filesize}')
 
                 if row['dms_id']:
-                    requests.post(f"{row['dms_id']}")
+                    try:
+                        requests.post(f"{row['dms_id']}")
+                    except Exception:
+                        time.sleep(5)
+                        try:
+                            requests.post(f"{row['dms_id']}")
+                        except Exception:
+                            time.sleep(50)
+                            requests.post(f"{row['dms_id']}")
 
             except:
                 exc = traceback.format_exc()
