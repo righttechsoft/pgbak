@@ -70,10 +70,13 @@ def call_hc(url: str, postfix: str = None, data: str = None):
     attempt = 1
     while attempt <= 3:
         try:
+            logging.info(f'Calling {url}/{postfix}')
             res = requests.post(f'{url}/{postfix}', data=data, timeout=60)
+            logging.info(f'Result: {res.status_code}')
             res.raise_for_status()
             return
         except:
+            logging.info(f'Waiting for {attempt*10}')
             time.sleep(attempt*10)
             attempt += 1
 
