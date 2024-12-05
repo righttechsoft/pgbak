@@ -66,8 +66,10 @@ def handle_error(func):
 
 sys.excepthook = handle_exception
 
+
 def call_hc(url: str, postfix: str = None, data: str = None):
     attempt = 1
+    postfix = postfix or ''  # Ensure postfix is an empty string if None
     while attempt <= 3:
         try:
             logging.info(f'Calling {url}/{postfix}')
@@ -76,8 +78,8 @@ def call_hc(url: str, postfix: str = None, data: str = None):
             res.raise_for_status()
             return
         except:
-            logging.info(f'Waiting for {attempt*10}')
-            time.sleep(attempt*10)
+            logging.info(f'Waiting for {attempt * 10}')
+            time.sleep(attempt * 10)
             attempt += 1
 
 def parse_postgres_connection_string(connection_string):
