@@ -302,6 +302,12 @@ def command_edit(conn):
                   where id = ?
     """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, row['id']))
 
+def command_del(conn):
+    result = ask_for_database(conn)
+    if not result:
+        return
+    conn.execute('delete from backup_log where server_id=?', (result,))
+    conn.execute('delete from servers where id=?', (result,))
 
 def ask_for_database(conn):
     c = conn.execute('select id, connection_string from servers')
@@ -403,7 +409,7 @@ def create_db_connection() -> sqlite3.Connection:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('command', type=str, choices=['add', 'list', 'logs', 'edit', 'run'])
+    parser.add_argument('command', type=str, choices=['add', 'del', 'list', 'logs', 'edit', 'run'])
     parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
     parser.add_argument('--server', type=int, nargs='?', default=False, const=True)
 
@@ -414,6 +420,8 @@ if __name__ == '__main__':
     match args.command:
         case 'add':
             command_add(conn)
+        case 'del':
+            command_del(conn)
         case 'edit':
             command_edit(conn)
         case 'list':
