@@ -119,9 +119,12 @@ def create_backup(
         pg_conn_string: str,
         backup_filename: str,
         archive_password: str,
-        exclude_tables: Optional[List[str]] = None
+        exclude_tables: Optional[List[str]] = None,
+        format: str = 'sql'  # 'sql' for SQL format, 'binary' for binary format
 ):
-    pg_dump_command = f'pg_dump -d {pg_conn_string} -F c -b -v'
+    # Format flag: -F p for plain text SQL, -F c for custom binary format
+    format_flag = '-F p' if format == 'sql' else '-F c -b'
+    pg_dump_command = f'pg_dump -d {pg_conn_string} {format_flag} -v'
 
     if exclude_tables:
         cleaned_tables = [table.strip() for table in exclude_tables if table.strip()]
@@ -130,8 +133,9 @@ def create_backup(
             pg_dump_command = f'{pg_dump_command} {exclusion_params}'
             logger.info(f'Excluding tables from backup: {", ".join(cleaned_tables)}')
 
+    password_param = f'-p"{archive_password}" -mhe=on' if archive_password else ''
     seven_zip_command = (
-        f'7z a -si -p"{archive_password}" -mhe=on -md=1m -ms=off '
+        f'7z a -si {password_param} -md=1m -ms=off '
         f'-mx=1 -mm=LZMA2 -mmt=1 {backup_filename}'
     )
 
@@ -167,7 +171,7 @@ def create_backup(
     else:
         raise Exception(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
 
-def run_backup(conn, force=False, server_id=None):
+def run_backup(conn, force=False, server_id=None, format='sql'):
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
         logger.debug(f'Created tmp dir {temp_dir}')
@@ -192,13 +196,14 @@ def run_backup(conn, force=False, server_id=None):
                     call_hc(row['dms_id'], 'start')
 
                 connection_string = row['connection_string']
-                # backup_filename = f'{row["archive_name"]}_{datetime.utcnow().strftime("%Y%m%dT%H%M%S")}.7z'
-                backup_filename = f'{row["archive_name"]}.7z'
+                # Add appropriate extension based on format
+                extension = '.sql.7z' if format == 'sql' else '.bin.7z'
+                backup_filename = f'{row["archive_name"]}{extension}'
                 conn_details = parse_postgres_connection_string(connection_string)
 
-                logger.info(f'Creating backup {conn_details["host"]}/{conn_details["database"]} to {backup_filename}')
+                logger.info(f'Creating {format} backup {conn_details["host"]}/{conn_details["database"]} to {backup_filename}')
                 archive_password = row['archive_password'] if row['archive_password'] else os.environ.get('ARCHIVE_PASSWORD')
-                create_backup(connection_string, backup_filename, archive_password)
+                create_backup(connection_string, backup_filename, archive_password, format=format)
                 filesize = os.path.getsize(backup_filename)
 
                 if filesize<4096:
@@ -412,6 +417,8 @@ if __name__ == '__main__':
     parser.add_argument('command', type=str, choices=['add', 'del', 'list', 'logs', 'edit', 'run'])
     parser.add_argument('--force', type=bool, nargs='?', default=False, const=True)
     parser.add_argument('--server', type=int, nargs='?', default=False, const=True)
+    parser.add_argument('--format', type=str, choices=['sql', 'binary'], default='sql', 
+                       help='Backup format: sql (plain SQL) or binary (PostgreSQL custom format)')
 
     args = parser.parse_args()
 
@@ -429,4 +436,4 @@ if __name__ == '__main__':
         case 'logs':
             command_logs(conn)
         case 'run':
-            run_backup(conn, args.force, args.server)
+            run_backup(conn, args.force, args.server, args.format)
