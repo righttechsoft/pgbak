@@ -30,6 +30,8 @@ RUN apt-get install -y --no-install-recommends python3.12-full python3-pip && cd
 WORKDIR /app
 COPY . .
 
+RUN chmod +x add.sh && chmod +x list.sh
+
 RUN python3.12 -m pip install pipenv && pipenv install --python 3.12
 
 CMD printenv > /etc/cron.d/cron && cat /app/crontab >> /etc/cron.d/cron && chmod 0644 /etc/cron.d/cron && crontab /etc/cron.d/cron && cron && rsyslogd && sleep 2 && tail -F /var/log/syslog
