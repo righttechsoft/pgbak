@@ -11,6 +11,7 @@
   <li>Upload backup files to Backblaze B2 storage</li>
   <li>Log backup results and file sizes</li>
   <li>Notify via DeadManSnitch when a backup is successfully uploaded</li>
+  <li><strong>Web UI</strong> for easy server management (FastAPI-based)</li>
 </ul>
 
 <h2>Installation</h2>
@@ -40,7 +41,19 @@
 
 <h2>Usage</h2>
 
-<pre><code>python pgbak.py [command] [--force]</code></pre>
+<h3>Web UI (Recommended)</h3>
+
+<pre><code># Start the web interface
+./start_web.sh
+
+# Or manually
+python web.py</code></pre>
+
+<p>Open your browser at <code>http://localhost:8000</code> to manage servers through the web interface.</p>
+
+<h3>Command Line Interface</h3>
+
+<pre><code>python main.py [command] [--force]</code></pre>
 
 <p>Available commands:</p>
 <ul>
