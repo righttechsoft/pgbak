@@ -25,14 +25,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
 
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
-RUN apt-get install -y --no-install-recommends python3.12-full python3-pip && cd /usr/lib/python3.12 && rm EXTERNALLY-MANAGED
+RUN apt-get install -y --no-install-recommends python3.13-full python3-pip && cd /usr/lib/python3.13 && rm EXTERNALLY-MANAGED
 
 WORKDIR /app
 COPY . .
 
 RUN chmod +x add.sh && chmod +x list.sh
 
-RUN python3.12 -m pip install pipenv && pipenv install --python 3.12
+RUN python3.13 -m pip install pipenv && pipenv install --python 3.13
 
-CMD printenv > /etc/cron.d/cron && cat /app/crontab >> /etc/cron.d/cron && chmod 0644 /etc/cron.d/cron && crontab /etc/cron.d/cron && cron && rsyslogd && sleep 2 && tail -F /var/log/syslog
+EXPOSE 8000
+
+CMD printenv > /etc/cron.d/cron && cat /app/crontab >> /etc/cron.d/cron && chmod 0644 /etc/cron.d/cron && crontab /etc/cron.d/cron && cron && rsyslogd && sleep 2 && pipenv run uvicorn web:app --host 0.0.0.0 --port 8000
 
