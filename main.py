@@ -68,18 +68,6 @@ def handle_error(func):
 sys.excepthook = handle_exception
 
 
-DEBUG = os.environ.get('DEBUG', '').lower() == 'true'
-
-
-def mask_string(s: str) -> str:
-    """Mask central characters of a string, showing only first and last 3 chars."""
-    if not s:
-        return '<empty>'
-    if len(s) <= 6:
-        return '*' * len(s)
-    return s[:3] + '*' * (len(s) - 6) + s[-3:]
-
-
 def call_hc(url: str, data: str = None):
     """Call a healthcheck URL with retries."""
     attempt = 1
@@ -222,10 +210,6 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
                 b2_app_key = row['B2_APP_KEY'] if row['B2_APP_KEY'] else os.environ.get('B2_APP_KEY')
                 b2_bucket = row['B2_BUCKET'] if row['B2_BUCKET'] else os.environ.get('B2_BUCKET')
-
-                if DEBUG:
-                    logger.info(f'B2 credentials - Key ID: {mask_string(b2_key_id)}, App Key: {mask_string(b2_app_key)}, Bucket: {b2_bucket}')
-
                 uploaded_file = upload_to_b2(b2_key_id, b2_app_key, b2_bucket, backup_filename)
                 logger.info(f'Success {uploaded_file=}')
 
