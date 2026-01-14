@@ -221,7 +221,7 @@
                             <td><div class="truncate" title="{{ server.connection_string }}">{{ server.connection_string }}</div></td>
                             <td>{{ server.frequency_hrs }}</td>
                             <td>{{ server.archive_name or '-' }}</td>
-                            <td>{{ server.last_backup or '-' }}</td>
+                            <td>{{ server.last_backup | relative_time }}</td>
                             <td>
                                 {% if server.last_backup_result == 'Success' %}
                                 <span class="badge badge-success">Success</span>

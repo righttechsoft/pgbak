@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
+from datetime import datetime, timezone
 
 from database import Database
 
@@ -11,6 +12,39 @@ app = FastAPI(title="PgBak Web UI")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+
+def relative_time(value: str) -> str:
+    """Convert timestamp (YYYYMMDDTHHMMSS) to relative time string."""
+    if not value:
+        return "-"
+    try:
+        dt = datetime.strptime(value, "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        diff = now - dt
+
+        seconds = int(diff.total_seconds())
+        if seconds < 60:
+            return f"{seconds} second{'s' if seconds != 1 else ''} ago"
+        minutes = seconds // 60
+        if minutes < 60:
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+        hours = minutes // 60
+        if hours < 24:
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        days = hours // 24
+        if days < 30:
+            return f"{days} day{'s' if days != 1 else ''} ago"
+        months = days // 30
+        if months < 12:
+            return f"{months} month{'s' if months != 1 else ''} ago"
+        years = days // 365
+        return f"{years} year{'s' if years != 1 else ''} ago"
+    except ValueError:
+        return value
+
+
+templates.env.filters["relative_time"] = relative_time
 
 
 @app.get("/", response_class=HTMLResponse)
