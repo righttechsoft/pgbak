@@ -2,7 +2,6 @@ import argparse
 import logging
 import math
 import os
-import sqlite3
 import time
 import sys
 import traceback
@@ -17,6 +16,8 @@ from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.validation import Validator, ValidationError
 from tabulate import tabulate
 from single_instance_helper import SingleInstance
+
+from database import Database
 
 me = SingleInstance('pgbak')
 
@@ -171,16 +172,11 @@ def create_backup(
     else:
         raise Exception(f'Error occurred during backup compression:\n{seven_zip_stderr.decode("utf-8")}')
 
-def run_backup(conn, force=False, server_id=None, format='sql'):
+def run_backup(db: Database, force=False, server_id=None, format='sql'):
     with TemporaryDirectory() as temp_dir:
         os.chdir(temp_dir)
         logger.debug(f'Created tmp dir {temp_dir}')
-        sql = 'SELECT * FROM servers'
-        if server_id:
-            sql += f' WHERE id = {server_id}'
-        c = conn.execute(sql)
-        rows = c.fetchall()
-        c.close()
+        rows = db.get_servers(server_id)
 
         for row in rows:
             if row['last_backup'] and not force:
@@ -217,26 +213,20 @@ def run_backup(conn, force=False, server_id=None, format='sql'):
                 uploaded_file = upload_to_b2(b2_key_id, b2_app_key, b2_bucket, backup_filename)
                 logger.info(f'Success {uploaded_file=}')
 
-                conn.execute("""
-                INSERT INTO backup_log (server_id, ts, "result", file_size) VALUES(?, ?, 'Success', ?)
-                """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), filesize))
-                conn.execute("UPDATE servers SET last_backup=?, last_backup_result='Success' WHERE id=?", (datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), row['id']))
+                db.log_backup_success(row['id'], filesize)
 
-                c = conn.execute('SELECT file_size FROM backup_log bl WHERE server_id=? ORDER BY ts DESC LIMIT 1', (row['id'],))
-                prev = c.fetchone()
-                c.close()
-                diff = abs(prev['file_size'] - filesize) / ((prev['file_size'] + filesize) / 2) * 100
-                if diff > 10:
-                    raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev["file_size"]}, now: {filesize}')
+                prev_file_size = db.get_previous_backup_size(row['id'])
+                if prev_file_size:
+                    diff = abs(prev_file_size - filesize) / ((prev_file_size + filesize) / 2) * 100
+                    if diff > 10:
+                        raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev_file_size}, now: {filesize}')
 
                 if row['dms_id']:
                     call_hc(row['dms_id'])
 
             except:
                 exc = traceback.format_exc()
-                conn.execute("""
-                INSERT INTO backup_log (server_id, ts, "result", success) VALUES(?, ?, ?, '0')
-                """, (row['id'], datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S"), exc))
+                db.log_backup_failure(row['id'], exc)
                 logger.error(f'Failed to backup {conn_details["host"]} / {conn_details["database"]}:\n{exc}')
                 call_hc(row['dms_id'], 'fail', str(exc))
 
@@ -260,7 +250,7 @@ class NotEmptyValidator(Validator):
             raise ValidationError(message='Enter the value')
 
 
-def command_add(conn):
+def command_add(db: Database):
     connection_string = prompt('connection_string: ', validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', validator=NumberValidator()))
     dms_id = prompt('dms_id: ')
@@ -274,20 +264,14 @@ def command_add(conn):
     archive_name = prompt('archive_name: ')
     archive_password = prompt('archive_password: ')
     archive_password = None if archive_password == '' else archive_password
-    conn.execute("""
-    INSERT INTO servers (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password) 
-                  VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-                 (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password))
+    db.add_server(connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password)
 
 
-def command_edit(conn):
-    result = ask_for_database(conn)
+def command_edit(db: Database):
+    result = ask_for_database(db)
     if not result:
         return
-    c = conn.execute('select * from servers where id=?', (result,))
-    row = c.fetchone()
-    c.close()
+    row = db.get_server_by_id(result)
 
     connection_string = prompt('connection_string: ', default=row['connection_string'], validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
@@ -302,22 +286,16 @@ def command_edit(conn):
     archive_name = prompt('archive_name: ', default=row['archive_name'])
     archive_password = prompt('archive_password: ', default=row['archive_password'] if row['archive_password'] else '')
     archive_password = None if archive_password == '' else archive_password
-    conn.execute("""
-    UPDATE servers SET connection_string=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, archive_name=?, archive_password=? 
-                  where id = ?
-    """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, row['id']))
+    db.update_server(row['id'], connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password)
 
-def command_del(conn):
-    result = ask_for_database(conn)
+def command_del(db: Database):
+    result = ask_for_database(db)
     if not result:
         return
-    conn.execute('delete from backup_log where server_id=?', (result,))
-    conn.execute('delete from servers where id=?', (result,))
+    db.delete_server(result)
 
-def ask_for_database(conn):
-    c = conn.execute('select id, connection_string from servers')
-    rows = c.fetchall()
-    c.close()
+def ask_for_database(db: Database):
+    rows = db.get_servers()
     values = list()
     for row in rows:
         conn_details = parse_postgres_connection_string(row['connection_string'])
@@ -331,23 +309,8 @@ def ask_for_database(conn):
     return result
 
 
-def command_list(conn):
-    c = conn.execute('''
-            SELECT id,
-                   connection_string ,
-                   frequency_hrs ,                
-                   IFNULL(B2_KEY_ID,'') B2_KEY_ID, 
-                   IFNULL(B2_APP_KEY,'') B2_APP_KEY,
-                   IFNULL(B2_BUCKET ,'') B2_BUCKET,
-                   IFNULL(archive_name ,'') archive_name, 
-                   IFNULL(archive_password ,'') archive_password,
-                   IFNULL(dms_id ,'') dms_id,
-                   IFNULL(last_backup ,'') last_backup,
-                   IFNULL(last_backup_result,'') last_backup_result
-            FROM servers
-    ''')
-    rows = c.fetchall()
-    c.close()
+def command_list(db: Database):
+    rows = db.get_all_servers_for_list()
     if len(rows) == 0:
         print('Nothing here')
         return
@@ -360,15 +323,11 @@ def command_list(conn):
     print(table)
 
 
-def command_logs(conn):
-    result = ask_for_database(conn)
+def command_logs(db: Database):
+    result = ask_for_database(db)
     if not result:
         return
-    c = conn.execute("""
-    select ts,"result",ifnull(file_size,'') file_size,success from backup_log where server_id=? order by ts desc
-    """, (result,))
-    rows = c.fetchall()
-    c.close()
+    rows = db.get_backup_logs(result)
 
     if len(rows) == 0:
         print('Nothing here')
@@ -382,35 +341,6 @@ def command_logs(conn):
     print(table)
 
 
-def create_db_connection() -> sqlite3.Connection:
-    if not os.path.isfile('/usr/local/etc/pgback/backup.sqlite'):
-        os.makedirs('/usr/local/etc/pgback/', exist_ok=True)
-        conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
-        create_tables_script = """
-            CREATE TABLE servers (
-                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                connection_string TEXT,
-                frequency_hrs INTEGER DEFAULT (1) NOT NULL,                
-                B2_KEY_ID TEXT, B2_APP_KEY TEXT, B2_BUCKET TEXT,
-                archive_name TEXT, archive_password TEXT,
-                dms_id TEXT,
-                last_backup TEXT,
-                last_backup_result TEXT);
-            CREATE TABLE backup_log (
-                server_id INTEGER NOT NULL,
-                ts TEXT NOT NULL,
-                "result" TEXT NOT NULL,
-                file_size NUMERIC, success TEXT(1) DEFAULT (1) NOT NULL,
-                CONSTRAINT backup_log_servers_FK FOREIGN KEY (server_id) REFERENCES servers(id)
-            );
-        """
-        conn.executescript(create_tables_script)
-    else:
-        conn = sqlite3.connect('/usr/local/etc/pgback/backup.sqlite', isolation_level=None)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -422,18 +352,18 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    conn: sqlite3.Connection = create_db_connection()
+    db = Database()
 
     match args.command:
         case 'add':
-            command_add(conn)
+            command_add(db)
         case 'del':
-            command_del(conn)
+            command_del(db)
         case 'edit':
-            command_edit(conn)
+            command_edit(db)
         case 'list':
-            command_list(conn)
+            command_list(db)
         case 'logs':
-            command_logs(conn)
+            command_logs(db)
         case 'run':
-            run_backup(conn, args.force, args.server, args.format)
+            run_backup(db, args.force, args.server, args.format)

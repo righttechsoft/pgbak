@@ -8,6 +8,11 @@ b2 = "*"
 logdna = "*"
 prompt-toolkit = "*"
 idna = ">=3.7"
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+pydantic = "*"
+jinja2 = "*"
+python-multipart = "*"
 
 [dev-packages]
 

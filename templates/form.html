@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if server %}Edit{% else %}Add{% endif %} Server - PgBak</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .back-link {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #334155;
+            font-size: 14px;
+        }
+        
+        .required {
+            color: #ef4444;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 32px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .section-title:first-child {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{% if server %}Edit Server{% else %}Add New Server{% endif %}</h1>
+            <a href="/" class="back-link">← Back to List</a>
+        </div>
+        
+        <div class="content">
+            <form method="post" action="{% if server %}/edit/{{ server.id }}{% else %}/add{% endif %}">
+                <div class="section-title">Database Connection</div>
+                
+                <div class="form-group">
+                    <label for="connection_string">Connection String <span class="required">*</span></label>
+                    <input 
+                        type="text" 
+                        id="connection_string" 
+                        name="connection_string" 
+                        value="{{ server.connection_string if server else '' }}"
+                        required
+                        placeholder="postgresql://user:password@host:5432/database"
+                    >
+                    <div class="help-text">PostgreSQL connection string in URI format</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="frequency_hrs">Backup Frequency (hours) <span class="required">*</span></label>
+                    <input 
+                        type="number" 
+                        id="frequency_hrs" 
+                        name="frequency_hrs" 
+                        value="{{ server.frequency_hrs if server else '24' }}"
+                        required
+                        min="1"
+                    >
+                    <div class="help-text">How often to run backups (in hours)</div>
+                </div>
+                
+                <div class="section-title">Backblaze B2 Storage</div>
+                
+                <div class="form-group">
+                    <label for="B2_KEY_ID">B2 Key ID</label>
+                    <input 
+                        type="text" 
+                        id="B2_KEY_ID" 
+                        name="B2_KEY_ID" 
+                        value="{{ server.B2_KEY_ID if server and server.B2_KEY_ID else '' }}"
+                        placeholder="Leave empty to use environment variable"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="B2_APP_KEY">B2 App Key</label>
+                    <input 
+                        type="password" 
+                        id="B2_APP_KEY" 
+                        name="B2_APP_KEY" 
+                        value="{{ server.B2_APP_KEY if server and server.B2_APP_KEY else '' }}"
+                        placeholder="Leave empty to use environment variable"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="B2_BUCKET">B2 Bucket</label>
+                    <input 
+                        type="text" 
+                        id="B2_BUCKET" 
+                        name="B2_BUCKET" 
+                        value="{{ server.B2_BUCKET if server and server.B2_BUCKET else '' }}"
+                        placeholder="Leave empty to use environment variable"
+                    >
+                </div>
+                
+                <div class="section-title">Archive Settings</div>
+                
+                <div class="form-group">
+                    <label for="archive_name">Archive Name</label>
+                    <input 
+                        type="text" 
+                        id="archive_name" 
+                        name="archive_name" 
+                        value="{{ server.archive_name if server and server.archive_name else '' }}"
+                        placeholder="backup"
+                    >
+                    <div class="help-text">Base name for backup archive files</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="archive_password">Archive Password</label>
+                    <input 
+                        type="password" 
+                        id="archive_password" 
+                        name="archive_password" 
+                        value="{{ server.archive_password if server and server.archive_password else '' }}"
+                        placeholder="Leave empty to use environment variable"
+                    >
+                    <div class="help-text">Password to encrypt the backup archive</div>
+                </div>
+                
+                <div class="section-title">Monitoring</div>
+                
+                <div class="form-group">
+                    <label for="dms_id">Dead Man's Switch URL</label>
+                    <input 
+                        type="text" 
+                        id="dms_id" 
+                        name="dms_id" 
+                        value="{{ server.dms_id if server and server.dms_id else '' }}"
+                        placeholder="https://healthchecks.io/ping/..."
+                    >
+                    <div class="help-text">Health check URL to ping on successful backup</div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        {% if server %}Update Server{% else %}Add Server{% endif %}
+                    </button>
+                    <a href="/" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
