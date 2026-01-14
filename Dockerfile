@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
 
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
-RUN apt-get install -y --no-install-recommends python3.13-full python3-pip && cd /usr/lib/python3.13 && rm EXTERNALLY-MANAGED
+RUN apt-get install -y --no-install-recommends python3.13-full python3-pip && rm -f /usr/lib/python3.13/EXTERNALLY-MANAGED /usr/lib/python3/EXTERNALLY-MANAGED
 
 WORKDIR /app
 COPY . .
