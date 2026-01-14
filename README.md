@@ -1,86 +1,146 @@
-<h1>pgbak</h1>
+# pgbak
 
-<p><code>pgbak</code> is a Python application for creating and managing backups of PostgreSQL databases. It allows you to configure multiple servers, schedule backups, and upload the compressed backup files to Backblaze B2 storage.</p>
+PostgreSQL backup automation tool with Backblaze B2 cloud storage integration.
 
-<h2>Features</h2>
+## Features
 
-<ul>
-  <li>Configure multiple PostgreSQL servers for backup</li>
-  <li>Schedule backups at specified frequencies</li>
-  <li>Compress backups using <code>7z</code> with optional encryption</li>
-  <li>Upload backup files to Backblaze B2 storage</li>
-  <li>Log backup results and file sizes</li>
-  <li>Notify via DeadManSnitch when a backup is successfully uploaded</li>
-  <li><strong>Web UI</strong> for easy server management (FastAPI-based)</li>
-</ul>
+- Configure multiple PostgreSQL servers for backup
+- Schedule backups at specified frequencies (hourly cron job)
+- Compress backups using 7z with LZMA2 and optional AES encryption
+- Upload backup files to Backblaze B2 storage
+- Support for SQL (plain text) and binary (PostgreSQL custom) backup formats
+- Log backup results and track file sizes
+- Health check integration (Dead Man's Switch / healthchecks.io)
+- **Web UI** for easy server management (FastAPI-based)
+- **CLI** for scripting and automation
+- Centralized logging via Mezmo (LogDNA)
 
-<h2>Installation</h2>
+## Quick Start with Docker
 
-<ol>
-  <li>Clone the repository:</li>
-</ol>
+```bash
+# Build the image
+docker build -t pgbak .
 
-<pre><code>git clone https://github.com/your-username/pgbak.git</code></pre>
+# Run the container
+docker run -d -p 8000:8000 \
+  -e MEZMO_INGESTION_KEY=your_key \
+  -e B2_KEY_ID=your_b2_key_id \
+  -e B2_APP_KEY=your_b2_app_key \
+  -e B2_BUCKET=your_bucket_name \
+  -v pgbak-data:/app \
+  pgbak
+```
 
-<ol start="2">
-  <li>Install the required dependencies:</li>
-</ol>
+Access the Web UI at `http://localhost:8000`
 
-<pre><code>pip install -r requirements.txt</code></pre>
+## Environment Variables
 
-<ol start="3">
-  <li>Set the necessary environment variables:</li>
-  <ul>
-    <li><code>MEZMO_INGESTION_KEY</code>: Mezmo ingestion key for logging (optional)</li>
-    <li><code>ARCHIVE_PASSWORD</code>: Default password for encrypting backup archives (optional)</li>
-    <li><code>B2_KEY_ID</code>: Default Backblaze B2 key ID (optional)</li>
-    <li><code>B2_APP_KEY</code>: Default Backblaze B2 application key (optional)</li>
-    <li><code>B2_BUCKET</code>: Default Backblaze B2 bucket name (optional)</li>
-  </ul>
-</ol>
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MEZMO_INGESTION_KEY` | Yes* | Mezmo ingestion key for logging |
+| `B2_KEY_ID` | No | Default Backblaze B2 key ID |
+| `B2_APP_KEY` | No | Default Backblaze B2 application key |
+| `B2_BUCKET` | No | Default Backblaze B2 bucket name |
+| `ARCHIVE_PASSWORD` | No | Default password for encrypting archives |
+| `DB_PATH` | No | SQLite database path (default: backup.sqlite) |
 
-<h2>Usage</h2>
+*Set to empty string if not using Mezmo logging
 
-<h3>Web UI (Recommended)</h3>
+## Usage
 
-<pre><code># Start the web interface
+### Web UI (Recommended)
+
+The web interface runs automatically in Docker on port 8000. Use it to:
+- View all configured servers and their backup status
+- Add, edit, or delete server configurations
+- View backup logs and history
+
+### Command Line Interface
+
+```bash
+# Run with pipenv
+pipenv run python main.py [command] [options]
+
+# Or use helper scripts
+./add.sh    # Add a new server
+./list.sh   # List all servers
+```
+
+**Available commands:**
+
+| Command | Description |
+|---------|-------------|
+| `add` | Add a new server configuration (interactive) |
+| `edit` | Edit an existing server configuration |
+| `del` | Delete a server configuration |
+| `list` | List all configured servers |
+| `logs` | Display backup logs for a selected server |
+| `run` | Run backups for all configured servers |
+
+**Options for `run` command:**
+
+```bash
+# Force backup regardless of frequency setting
+python main.py run --force
+
+# Backup specific server only
+python main.py run --server <id>
+
+# Use binary format instead of SQL
+python main.py run --format binary
+```
+
+## Server Configuration
+
+Each server configuration includes:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `connection_string` | Yes | PostgreSQL URI (e.g., `postgresql://user:pass@host:5432/db`) |
+| `frequency_hrs` | Yes | Backup frequency in hours |
+| `archive_name` | No | Base name for backup files |
+| `archive_password` | No | Password for 7z encryption (overrides env default) |
+| `B2_KEY_ID` | No | Server-specific B2 key (overrides env default) |
+| `B2_APP_KEY` | No | Server-specific B2 app key (overrides env default) |
+| `B2_BUCKET` | No | Server-specific B2 bucket (overrides env default) |
+| `dms_id` | No | Health check URL (e.g., healthchecks.io ping URL) |
+
+## How It Works
+
+1. **Cron Job**: Runs `python main.py run` every hour
+2. **Frequency Check**: Only backs up servers that have exceeded their frequency threshold
+3. **Backup Process**:
+   - Calls health check start endpoint (if configured)
+   - Runs `pg_dump` piped directly to `7z` for streaming compression
+   - Uploads compressed archive to Backblaze B2
+   - Validates backup size (minimum 4KB, alerts on >10% size change)
+   - Logs result and calls health check completion endpoint
+
+## Requirements
+
+- Python 3.13
+- PostgreSQL client (pg_dump)
+- 7zip (p7zip-full)
+- Backblaze B2 account
+
+## Local Development
+
+```bash
+# Install dependencies
+pip install pipenv
+pipenv install
+
+# Set environment variables
+export MEZMO_INGESTION_KEY=""  # Empty to disable Mezmo
+export DB_PATH=backup.sqlite
+
+# Run web UI locally
+pipenv run uvicorn web:app --reload --port 8000
+
+# Or use the helper script
 ./start_web.sh
+```
 
-# Or manually
-python web.py</code></pre>
+## License
 
-<p>Open your browser at <code>http://localhost:8000</code> to manage servers through the web interface.</p>
-
-<h3>Command Line Interface</h3>
-
-<pre><code>python main.py [command] [--force]</code></pre>
-
-<p>Available commands:</p>
-<ul>
-  <li><code>add</code>: Add a new server configuration</li>
-  <li><code>edit</code>: Edit an existing server configuration</li>
-  <li><code>list</code>: List all configured servers</li>
-  <li><code>logs</code>: Display backup logs for a selected server</li>
-  <li><code>run</code>: Run the backup process for all configured servers</li>
-</ul>
-
-<p>The <code>--force</code> option can be used with the <code>run</code> command to force backups even if the configured frequency has not been reached.</p>
-
-<h2>Configuration</h2>
-
-<p><code>pgbak</code> stores server configurations in an SQLite database located at <code>/usr/local/etc/pgback/backup.sqlite</code>. Each server configuration includes the following parameters:</p>
-
-<ul>
-  <li><code>connection_string</code>: PostgreSQL connection string for the server</li>
-  <li><code>frequency_hrs</code>: Backup frequency in hours</li>
-  <li><code>dms_id</code>: DeadManSnitch ID for notifications (optional)</li>
-  <li><code>B2_KEY_ID</code>: Backblaze B2 key ID (optional, overrides the default)</li>
-  <li><code>B2_APP_KEY</code>: Backblaze B2 application key (optional, overrides the default)</li>
-  <li><code>B2_BUCKET</code>: Backblaze B2 bucket name (optional, overrides the default)</li>
-  <li><code>archive_name</code>: Name of the backup archive file</li>
-  <li><code>archive_password</code>: Password for encrypting the backup archive (optional, overrides the default)</li>
-</ul>
-
-<h2>License</h2>
-
-<p>This project is licensed under the <a href="LICENSE">MIT License</a>.</p>
+This project is licensed under the [MIT License](LICENSE).
