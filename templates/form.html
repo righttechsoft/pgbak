@@ -84,6 +84,38 @@
             font-size: 14px;
             transition: all 0.3s ease;
         }
+
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-wrapper input {
+            padding-right: 44px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-password:hover {
+            color: #334155;
+        }
+
+        .toggle-password svg {
+            width: 20px;
+            height: 20px;
+        }
         
         input:focus {
             outline: none;
@@ -202,13 +234,25 @@
                 
                 <div class="form-group">
                     <label for="B2_APP_KEY">B2 App Key</label>
-                    <input 
-                        type="password" 
-                        id="B2_APP_KEY" 
-                        name="B2_APP_KEY" 
-                        value="{{ server.B2_APP_KEY if server and server.B2_APP_KEY else '' }}"
-                        placeholder="Leave empty to use environment variable"
-                    >
+                    <div class="password-wrapper">
+                        <input
+                            type="password"
+                            id="B2_APP_KEY"
+                            name="B2_APP_KEY"
+                            value="{{ server.B2_APP_KEY if server and server.B2_APP_KEY else '' }}"
+                            placeholder="Leave empty to use environment variable"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('B2_APP_KEY', this)" title="Show password">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -238,13 +282,25 @@
                 
                 <div class="form-group">
                     <label for="archive_password">Archive Password</label>
-                    <input 
-                        type="password" 
-                        id="archive_password" 
-                        name="archive_password" 
-                        value="{{ server.archive_password if server and server.archive_password else '' }}"
-                        placeholder="Leave empty to use environment variable"
-                    >
+                    <div class="password-wrapper">
+                        <input
+                            type="password"
+                            id="archive_password"
+                            name="archive_password"
+                            value="{{ server.archive_password if server and server.archive_password else '' }}"
+                            placeholder="Leave empty to use environment variable"
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('archive_password', this)" title="Show password">
+                            <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                        </button>
+                    </div>
                     <div class="help-text">Password to encrypt the backup archive</div>
                 </div>
                 
@@ -271,5 +327,24 @@
             </form>
         </div>
     </div>
+    <script>
+        function togglePassword(inputId, button) {
+            const input = document.getElementById(inputId);
+            const eyeIcon = button.querySelector('.eye-icon');
+            const eyeOffIcon = button.querySelector('.eye-off-icon');
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+                button.title = 'Hide password';
+            } else {
+                input.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+                button.title = 'Show password';
+            }
+        }
+    </script>
 </body>
 </html>
