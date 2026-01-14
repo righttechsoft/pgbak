@@ -10,8 +10,11 @@ PostgreSQL backup automation tool with Backblaze B2 cloud storage integration.
 - Upload backup files to Backblaze B2 storage
 - Support for SQL (plain text) and binary (PostgreSQL custom) backup formats
 - Log backup results and track file sizes
-- Health check integration (Dead Man's Switch / healthchecks.io)
+- Health check integration with separate URLs for start/success/fail events (healthchecks.io compatible)
 - **Web UI** for easy server management (FastAPI-based)
+  - Run backups manually with one click
+  - Relative time display for last backup ("2 hours ago")
+  - Password visibility toggle
 - **CLI** for scripting and automation
 - Centralized logging via Mezmo (LogDNA)
 
@@ -103,18 +106,20 @@ Each server configuration includes:
 | `B2_KEY_ID` | No | Server-specific B2 key (overrides env default) |
 | `B2_APP_KEY` | No | Server-specific B2 app key (overrides env default) |
 | `B2_BUCKET` | No | Server-specific B2 bucket (overrides env default) |
-| `dms_id` | No | Health check URL (e.g., healthchecks.io ping URL) |
+| `hc_url_start` | No | Healthcheck URL to call when backup starts |
+| `hc_url_success` | No | Healthcheck URL to call on successful backup |
+| `hc_url_fail` | No | Healthcheck URL to call on backup failure |
 
 ## How It Works
 
 1. **Cron Job**: Runs `python main.py run` every hour
 2. **Frequency Check**: Only backs up servers that have exceeded their frequency threshold
 3. **Backup Process**:
-   - Calls health check start endpoint (if configured)
+   - Calls `hc_url_start` (if configured)
    - Runs `pg_dump` piped directly to `7z` for streaming compression
    - Uploads compressed archive to Backblaze B2
    - Validates backup size (minimum 4KB, alerts on >10% size change)
-   - Logs result and calls health check completion endpoint
+   - Logs result and calls `hc_url_success` or `hc_url_fail` accordingly
 
 ## Requirements
 

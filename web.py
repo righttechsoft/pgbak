@@ -62,7 +62,21 @@ def relative_time(value: str) -> str:
         return value
 
 
+def format_timestamp(value: str) -> str:
+    """Convert timestamp (YYYYMMDDTHHMMSS) to 'DD Mon YY HH:MM (relative time)' format."""
+    if not value:
+        return "-"
+    try:
+        dt = datetime.strptime(value, "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
+        formatted = dt.strftime("%d %b %y %H:%M")
+        relative = relative_time(value)
+        return f"{formatted} ({relative})"
+    except ValueError:
+        return value
+
+
 templates.env.filters["relative_time"] = relative_time
+templates.env.filters["format_timestamp"] = format_timestamp
 
 
 @app.get("/", response_class=HTMLResponse)

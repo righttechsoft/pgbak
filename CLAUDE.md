@@ -19,6 +19,7 @@ pgbak/
 │   ├── index.html          # Server list page
 │   ├── form.html           # Add/edit server form
 │   └── logs.html           # Backup logs viewer
+├── static/                 # Static assets (favicon)
 └── *.sh                    # Utility shell scripts
 ```
 
@@ -40,18 +41,21 @@ pgbak/
 ### database.py
 - SQLite database wrapper class
 - **Tables**:
-  - `servers`: connection_string, frequency_hrs, B2 credentials, archive settings, DMS URL
+  - `servers`: connection_string, frequency_hrs, B2 credentials, archive settings, healthcheck URLs
   - `backup_log`: timestamp, result, file_size, success flag
 - Database path configurable via `DB_PATH` env var (default: `backup.sqlite`)
+- **Schema migration**: Automatically removes obsolete columns and migrates legacy `dms_id` to `hc_url_success`
 
 ### web.py
 - FastAPI application on port 8000
 - **Endpoints**:
-  - `GET /` - Server list
+  - `GET /` - Server list with relative time display for last backup
   - `GET/POST /add` - Add server
   - `GET/POST /edit/{id}` - Edit server
   - `POST /delete/{id}` - Delete server
+  - `POST /run/{id}` - Trigger manual backup for a server
   - `GET /logs/{id}` - View backup logs
+- **UI Features**: Password visibility toggle, favicon support, Run button for manual backups
 
 ### Dockerfile
 - Base: Ubuntu with Python 3.13 from deadsnakes PPA
@@ -106,8 +110,9 @@ docker run -d -p 8000:8000 \
 1. **Single Instance**: `SingleInstance('pgbak')` prevents concurrent backup runs using file locking
 2. **Backup Size Validation**: Alerts if backup size differs >10% from previous backup
 3. **Minimum Size Check**: Rejects backups smaller than 4KB as likely failures
-4. **Health Checks**: Supports Dead Man's Switch pattern (healthchecks.io compatible)
+4. **Health Checks**: Supports separate URLs for start/success/fail events (healthchecks.io compatible)
 5. **Compression**: Uses 7z with LZMA2, optional AES encryption (`-mhe=on`)
+6. **Schema Migration**: Database automatically migrates on startup to handle schema changes
 
 ## Common Tasks
 

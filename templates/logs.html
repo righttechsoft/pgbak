@@ -219,7 +219,7 @@
                     <tbody>
                         {% for log in logs %}
                         <tr>
-                            <td><span class="timestamp">{{ log.ts }}</span></td>
+                            <td><span class="timestamp">{{ log.ts | format_timestamp }}</span></td>
                             <td>
                                 {% if log.success == '1' %}
                                 <span class="badge badge-success">Success</span>
