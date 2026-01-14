@@ -1,11 +1,29 @@
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 from datetime import datetime, timezone
+import subprocess
+import fcntl
+import os
 
 from database import Database
+
+
+def is_backup_running() -> bool:
+    """Check if a backup is currently running by testing the lock file."""
+    lock_file = '/tmp/pgbak.lock'
+    if not os.path.exists(lock_file):
+        return False
+    try:
+        fp = open(lock_file, 'w')
+        fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.lockf(fp, fcntl.LOCK_UN)
+        fp.close()
+        return False
+    except IOError:
+        return True
 
 app = FastAPI(title="PgBak Web UI")
 
@@ -155,6 +173,36 @@ async def delete_server(server_id: int):
         return RedirectResponse(url="/", status_code=303)
     finally:
         db.close()
+
+
+@app.post("/run/{server_id}")
+async def run_backup(server_id: int):
+    """Run backup for a specific server."""
+    if is_backup_running():
+        return JSONResponse(
+            status_code=409,
+            content={"error": "A backup is already running"}
+        )
+
+    db = Database()
+    try:
+        server = db.get_server_by_id(server_id)
+        if not server:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Server not found"}
+            )
+    finally:
+        db.close()
+
+    subprocess.Popen(
+        ["pipenv", "run", "python", "main.py", "run", "--force", "--server", str(server_id)],
+        cwd="/app",
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
+    return JSONResponse(content={"success": True, "message": "Backup started"})
 
 
 @app.get("/logs/{server_id}", response_class=HTMLResponse)
