@@ -24,8 +24,9 @@ class Database:
             self._create_tables()
         else:
             self.conn = sqlite3.connect(self.db_path, isolation_level=None)
-        
+
         self.conn.row_factory = sqlite3.Row
+        self._migrate_schema()
     
     def _create_tables(self):
         """Create database tables."""
@@ -48,7 +49,18 @@ class Database:
             );
         """
         self.conn.executescript(create_tables_script)
-    
+
+    def _migrate_schema(self):
+        """Remove obsolete columns from servers table if they exist."""
+        cursor = self.conn.execute("PRAGMA table_info(servers)")
+        columns = {row[1] for row in cursor.fetchall()}
+        cursor.close()
+
+        obsolete_columns = ['port', 'database', 'user', 'password', 'keep_last_files']
+        for col in obsolete_columns:
+            if col in columns:
+                self.conn.execute(f'ALTER TABLE servers DROP COLUMN "{col}"')
+
     def get_servers(self, server_id: Optional[int] = None) -> List[sqlite3.Row]:
         """
         Get servers from database.
