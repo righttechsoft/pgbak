@@ -8,6 +8,7 @@ from database import Database
 
 app = FastAPI(title="PgBak Web UI")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
