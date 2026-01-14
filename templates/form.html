@@ -308,18 +308,42 @@
                     <div class="help-text">Password to encrypt the backup archive</div>
                 </div>
                 
-                <div class="section-title">Monitoring</div>
-                
+                <div class="section-title">Healthcheck URLs</div>
+
                 <div class="form-group">
-                    <label for="dms_id">Healthcheck URL</label>
-                    <input 
-                        type="text" 
-                        id="dms_id" 
-                        name="dms_id" 
-                        value="{{ server.dms_id if server and server.dms_id else '' }}"
+                    <label for="hc_url_start">Call on Start</label>
+                    <input
+                        type="text"
+                        id="hc_url_start"
+                        name="hc_url_start"
+                        value="{{ server.hc_url_start if server and server.hc_url_start else '' }}"
+                        placeholder="https://healthchecks.io/ping/.../start"
+                    >
+                    <div class="help-text">URL to call when backup starts</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="hc_url_success">Call on Success</label>
+                    <input
+                        type="text"
+                        id="hc_url_success"
+                        name="hc_url_success"
+                        value="{{ server.hc_url_success if server and server.hc_url_success else '' }}"
                         placeholder="https://healthchecks.io/ping/..."
                     >
-                    <div class="help-text">Health check URL to ping on successful backup</div>
+                    <div class="help-text">URL to call when backup completes successfully</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="hc_url_fail">Call on Fail</label>
+                    <input
+                        type="text"
+                        id="hc_url_fail"
+                        name="hc_url_fail"
+                        value="{{ server.hc_url_fail if server and server.hc_url_fail else '' }}"
+                        placeholder="https://healthchecks.io/ping/.../fail"
+                    >
+                    <div class="help-text">URL to call when backup fails</div>
                 </div>
                 
                 <div class="form-actions">

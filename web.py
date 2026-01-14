@@ -92,12 +92,14 @@ async def add_form(request: Request):
 async def add_server(
     connection_string: str = Form(...),
     frequency_hrs: int = Form(...),
-    dms_id: Optional[str] = Form(None),
     B2_KEY_ID: Optional[str] = Form(None),
     B2_APP_KEY: Optional[str] = Form(None),
     B2_BUCKET: Optional[str] = Form(None),
     archive_name: Optional[str] = Form(None),
-    archive_password: Optional[str] = Form(None)
+    archive_password: Optional[str] = Form(None),
+    hc_url_start: Optional[str] = Form(None),
+    hc_url_success: Optional[str] = Form(None),
+    hc_url_fail: Optional[str] = Form(None)
 ):
     """Add new server."""
     db = Database()
@@ -105,12 +107,14 @@ async def add_server(
         db.add_server(
             connection_string=connection_string,
             frequency_hrs=frequency_hrs,
-            dms_id=dms_id if dms_id else None,
             B2_KEY_ID=B2_KEY_ID if B2_KEY_ID else None,
             B2_APP_KEY=B2_APP_KEY if B2_APP_KEY else None,
             B2_BUCKET=B2_BUCKET if B2_BUCKET else None,
             archive_name=archive_name if archive_name else None,
-            archive_password=archive_password if archive_password else None
+            archive_password=archive_password if archive_password else None,
+            hc_url_start=hc_url_start if hc_url_start else None,
+            hc_url_success=hc_url_success if hc_url_success else None,
+            hc_url_fail=hc_url_fail if hc_url_fail else None
         )
         return RedirectResponse(url="/", status_code=303)
     finally:
@@ -138,12 +142,14 @@ async def edit_server(
     server_id: int,
     connection_string: str = Form(...),
     frequency_hrs: int = Form(...),
-    dms_id: Optional[str] = Form(None),
     B2_KEY_ID: Optional[str] = Form(None),
     B2_APP_KEY: Optional[str] = Form(None),
     B2_BUCKET: Optional[str] = Form(None),
     archive_name: Optional[str] = Form(None),
-    archive_password: Optional[str] = Form(None)
+    archive_password: Optional[str] = Form(None),
+    hc_url_start: Optional[str] = Form(None),
+    hc_url_success: Optional[str] = Form(None),
+    hc_url_fail: Optional[str] = Form(None)
 ):
     """Update server."""
     db = Database()
@@ -152,12 +158,14 @@ async def edit_server(
             server_id=server_id,
             connection_string=connection_string,
             frequency_hrs=frequency_hrs,
-            dms_id=dms_id if dms_id else None,
             B2_KEY_ID=B2_KEY_ID if B2_KEY_ID else None,
             B2_APP_KEY=B2_APP_KEY if B2_APP_KEY else None,
             B2_BUCKET=B2_BUCKET if B2_BUCKET else None,
             archive_name=archive_name if archive_name else None,
-            archive_password=archive_password if archive_password else None
+            archive_password=archive_password if archive_password else None,
+            hc_url_start=hc_url_start if hc_url_start else None,
+            hc_url_success=hc_url_success if hc_url_success else None,
+            hc_url_fail=hc_url_fail if hc_url_fail else None
         )
         return RedirectResponse(url="/", status_code=303)
     finally:

@@ -68,13 +68,13 @@ def handle_error(func):
 sys.excepthook = handle_exception
 
 
-def call_hc(url: str, postfix: str = None, data: str = None):
+def call_hc(url: str, data: str = None):
+    """Call a healthcheck URL with retries."""
     attempt = 1
-    postfix = postfix or ''  # Ensure postfix is an empty string if None
     while attempt <= 3:
         try:
-            logging.info(f'Calling {url}/{postfix}')
-            res = requests.post(f'{url}/{postfix}', data=data, timeout=60)
+            logging.info(f'Calling {url}')
+            res = requests.post(url, data=data, timeout=60)
             logging.info(f'Result: {res.status_code}')
             res.raise_for_status()
             return
@@ -188,8 +188,8 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 if hours_diff < row['frequency_hrs']:
                     continue
             try:
-                if row['dms_id']:
-                    call_hc(row['dms_id'], 'start')
+                if row['hc_url_start']:
+                    call_hc(row['hc_url_start'])
 
                 connection_string = row['connection_string']
                 # Add appropriate extension based on format
@@ -221,14 +221,15 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                     if diff > 10:
                         raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev_file_size}, now: {filesize}')
 
-                if row['dms_id']:
-                    call_hc(row['dms_id'])
+                if row['hc_url_success']:
+                    call_hc(row['hc_url_success'])
 
             except:
                 exc = traceback.format_exc()
                 db.log_backup_failure(row['id'], exc)
                 logger.error(f'Failed to backup {conn_details["host"]} / {conn_details["database"]}:\n{exc}')
-                call_hc(row['dms_id'], 'fail', str(exc))
+                if row['hc_url_fail']:
+                    call_hc(row['hc_url_fail'], data=str(exc))
 
 
 class NumberValidator(Validator):
@@ -253,8 +254,6 @@ class NotEmptyValidator(Validator):
 def command_add(db: Database):
     connection_string = prompt('connection_string: ', validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', validator=NumberValidator()))
-    dms_id = prompt('dms_id: ')
-    dms_id = None if dms_id == '' else dms_id
     B2_KEY_ID = prompt('B2_KEY_ID: ')
     B2_KEY_ID = None if B2_KEY_ID == '' else B2_KEY_ID
     B2_APP_KEY = prompt('B2_APP_KEY: ')
@@ -264,7 +263,13 @@ def command_add(db: Database):
     archive_name = prompt('archive_name: ')
     archive_password = prompt('archive_password: ')
     archive_password = None if archive_password == '' else archive_password
-    db.add_server(connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password)
+    hc_url_start = prompt('hc_url_start: ')
+    hc_url_start = None if hc_url_start == '' else hc_url_start
+    hc_url_success = prompt('hc_url_success: ')
+    hc_url_success = None if hc_url_success == '' else hc_url_success
+    hc_url_fail = prompt('hc_url_fail: ')
+    hc_url_fail = None if hc_url_fail == '' else hc_url_fail
+    db.add_server(connection_string, frequency_hrs, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, hc_url_start, hc_url_success, hc_url_fail)
 
 
 def command_edit(db: Database):
@@ -275,8 +280,6 @@ def command_edit(db: Database):
 
     connection_string = prompt('connection_string: ', default=row['connection_string'], validator=NotEmptyValidator())
     frequency_hrs = int(prompt('frequency_hrs: ', default=str(row['frequency_hrs']), validator=NumberValidator()))
-    dms_id = prompt('dms_id: ', default=row['dms_id'] if row['dms_id'] else '')
-    dms_id = None if dms_id == '' else dms_id
     B2_KEY_ID = prompt('B2_KEY_ID: ', default=row['B2_KEY_ID'] if row['B2_KEY_ID'] else '')
     B2_KEY_ID = None if B2_KEY_ID == '' else B2_KEY_ID
     B2_APP_KEY = prompt('B2_APP_KEY: ', default=row['B2_APP_KEY'] if row['B2_APP_KEY'] else '')
@@ -286,7 +289,13 @@ def command_edit(db: Database):
     archive_name = prompt('archive_name: ', default=row['archive_name'])
     archive_password = prompt('archive_password: ', default=row['archive_password'] if row['archive_password'] else '')
     archive_password = None if archive_password == '' else archive_password
-    db.update_server(row['id'], connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password)
+    hc_url_start = prompt('hc_url_start: ', default=row['hc_url_start'] if row['hc_url_start'] else '')
+    hc_url_start = None if hc_url_start == '' else hc_url_start
+    hc_url_success = prompt('hc_url_success: ', default=row['hc_url_success'] if row['hc_url_success'] else '')
+    hc_url_success = None if hc_url_success == '' else hc_url_success
+    hc_url_fail = prompt('hc_url_fail: ', default=row['hc_url_fail'] if row['hc_url_fail'] else '')
+    hc_url_fail = None if hc_url_fail == '' else hc_url_fail
+    db.update_server(row['id'], connection_string, frequency_hrs, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, hc_url_start, hc_url_success, hc_url_fail)
 
 def command_del(db: Database):
     result = ask_for_database(db)

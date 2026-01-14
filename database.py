@@ -37,7 +37,9 @@ class Database:
                 frequency_hrs INTEGER DEFAULT (1) NOT NULL,                
                 B2_KEY_ID TEXT, B2_APP_KEY TEXT, B2_BUCKET TEXT,
                 archive_name TEXT, archive_password TEXT,
-                dms_id TEXT,
+                hc_url_start TEXT,
+                hc_url_success TEXT,
+                hc_url_fail TEXT,
                 last_backup TEXT,
                 last_backup_result TEXT);
             CREATE TABLE backup_log (
@@ -51,15 +53,24 @@ class Database:
         self.conn.executescript(create_tables_script)
 
     def _migrate_schema(self):
-        """Remove obsolete columns from servers table if they exist."""
+        """Migrate database schema to current version."""
         cursor = self.conn.execute("PRAGMA table_info(servers)")
         columns = {row[1] for row in cursor.fetchall()}
         cursor.close()
 
+        # Remove obsolete columns
         obsolete_columns = ['port', 'database', 'user', 'password', 'keep_last_files']
         for col in obsolete_columns:
             if col in columns:
                 self.conn.execute(f'ALTER TABLE servers DROP COLUMN "{col}"')
+
+        # Migrate dms_id to hc_url_success and add new healthcheck columns
+        if 'dms_id' in columns:
+            self.conn.execute('ALTER TABLE servers RENAME COLUMN dms_id TO hc_url_success')
+        if 'hc_url_start' not in columns:
+            self.conn.execute('ALTER TABLE servers ADD COLUMN hc_url_start TEXT')
+        if 'hc_url_fail' not in columns:
+            self.conn.execute('ALTER TABLE servers ADD COLUMN hc_url_fail TEXT')
 
     def get_servers(self, server_id: Optional[int] = None) -> List[sqlite3.Row]:
         """
@@ -94,50 +105,56 @@ class Database:
         c.close()
         return row
     
-    def add_server(self, connection_string: str, frequency_hrs: int, 
-                   dms_id: Optional[str] = None, B2_KEY_ID: Optional[str] = None,
-                   B2_APP_KEY: Optional[str] = None, B2_BUCKET: Optional[str] = None,
-                   archive_name: Optional[str] = None, archive_password: Optional[str] = None):
+    def add_server(self, connection_string: str, frequency_hrs: int,
+                   B2_KEY_ID: Optional[str] = None, B2_APP_KEY: Optional[str] = None,
+                   B2_BUCKET: Optional[str] = None, archive_name: Optional[str] = None,
+                   archive_password: Optional[str] = None, hc_url_start: Optional[str] = None,
+                   hc_url_success: Optional[str] = None, hc_url_fail: Optional[str] = None):
         """
         Add a new server to the database.
-        
+
         Args:
             connection_string: PostgreSQL connection string
             frequency_hrs: Backup frequency in hours
-            dms_id: Dead Man's Switch ID (optional)
             B2_KEY_ID: Backblaze B2 Key ID (optional)
             B2_APP_KEY: Backblaze B2 App Key (optional)
             B2_BUCKET: Backblaze B2 Bucket name (optional)
             archive_name: Archive file name (optional)
             archive_password: Archive password (optional)
+            hc_url_start: Healthcheck URL to call on backup start (optional)
+            hc_url_success: Healthcheck URL to call on backup success (optional)
+            hc_url_fail: Healthcheck URL to call on backup failure (optional)
         """
         self.conn.execute("""
-        INSERT INTO servers (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password) 
-                      VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-        """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password))
+        INSERT INTO servers (connection_string, frequency_hrs, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, hc_url_start, hc_url_success, hc_url_fail)
+                      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (connection_string, frequency_hrs, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, hc_url_start, hc_url_success, hc_url_fail))
     
     def update_server(self, server_id: int, connection_string: str, frequency_hrs: int,
-                      dms_id: Optional[str] = None, B2_KEY_ID: Optional[str] = None,
-                      B2_APP_KEY: Optional[str] = None, B2_BUCKET: Optional[str] = None,
-                      archive_name: Optional[str] = None, archive_password: Optional[str] = None):
+                      B2_KEY_ID: Optional[str] = None, B2_APP_KEY: Optional[str] = None,
+                      B2_BUCKET: Optional[str] = None, archive_name: Optional[str] = None,
+                      archive_password: Optional[str] = None, hc_url_start: Optional[str] = None,
+                      hc_url_success: Optional[str] = None, hc_url_fail: Optional[str] = None):
         """
         Update an existing server.
-        
+
         Args:
             server_id: Server ID to update
             connection_string: PostgreSQL connection string
             frequency_hrs: Backup frequency in hours
-            dms_id: Dead Man's Switch ID (optional)
             B2_KEY_ID: Backblaze B2 Key ID (optional)
             B2_APP_KEY: Backblaze B2 App Key (optional)
             B2_BUCKET: Backblaze B2 Bucket name (optional)
             archive_name: Archive file name (optional)
             archive_password: Archive password (optional)
+            hc_url_start: Healthcheck URL to call on backup start (optional)
+            hc_url_success: Healthcheck URL to call on backup success (optional)
+            hc_url_fail: Healthcheck URL to call on backup failure (optional)
         """
         self.conn.execute("""
-        UPDATE servers SET connection_string=?, frequency_hrs=?, dms_id=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, archive_name=?, archive_password=? 
+        UPDATE servers SET connection_string=?, frequency_hrs=?, B2_KEY_ID=?, B2_APP_KEY=?, B2_BUCKET=?, archive_name=?, archive_password=?, hc_url_start=?, hc_url_success=?, hc_url_fail=?
                       WHERE id = ?
-        """, (connection_string, frequency_hrs, dms_id, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, server_id))
+        """, (connection_string, frequency_hrs, B2_KEY_ID, B2_APP_KEY, B2_BUCKET, archive_name, archive_password, hc_url_start, hc_url_success, hc_url_fail, server_id))
     
     def delete_server(self, server_id: int):
         """
@@ -165,7 +182,9 @@ class Database:
                    IFNULL(B2_BUCKET ,'') B2_BUCKET,
                    IFNULL(archive_name ,'') archive_name, 
                    IFNULL(archive_password ,'') archive_password,
-                   IFNULL(dms_id ,'') dms_id,
+                   IFNULL(hc_url_start ,'') hc_url_start,
+                   IFNULL(hc_url_success ,'') hc_url_success,
+                   IFNULL(hc_url_fail ,'') hc_url_fail,
                    IFNULL(last_backup ,'') last_backup,
                    IFNULL(last_backup_result,'') last_backup_result
             FROM servers
@@ -217,16 +236,22 @@ class Database:
     def log_backup_failure(self, server_id: int, error_message: str):
         """
         Log a failed backup.
-        
+
         Args:
             server_id: Server ID
             error_message: Error message/traceback
         """
         ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S")
         self.conn.execute("""
-        INSERT INTO backup_log (server_id, ts, "result", success) 
+        INSERT INTO backup_log (server_id, ts, "result", success)
         VALUES(?, ?, ?, '0')
         """, (server_id, ts, error_message))
+
+        self.conn.execute("""
+        UPDATE servers
+        SET last_backup=?, last_backup_result='Failed'
+        WHERE id=?
+        """, (ts, server_id))
     
     def get_previous_backup_size(self, server_id: int) -> Optional[int]:
         """
