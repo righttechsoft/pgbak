@@ -264,10 +264,10 @@ class Database:
             File size in bytes or None
         """
         c = self.conn.execute("""
-        SELECT file_size 
-        FROM backup_log 
-        WHERE server_id=? 
-        ORDER BY ts DESC 
+        SELECT file_size
+        FROM backup_log
+        WHERE server_id=? AND success='1'
+        ORDER BY ts DESC
         LIMIT 1
         """, (server_id,))
         prev = c.fetchone()

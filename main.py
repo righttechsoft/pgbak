@@ -163,9 +163,9 @@ def create_backup(
     logger.info(pg_dump_stderr.decode("utf-8"))
     logger.info(seven_zip_stderr.decode("utf-8"))
 
-#    if pg_dump_process.returncode != 0:
-#        err = pg_dump_stderr.decode("utf-8")
-#        raise Exception(f'Error occurred during database dump:\n{err}')
+    if pg_dump_process.returncode != 0:
+        err = pg_dump_stderr.decode("utf-8")
+        raise Exception(f'Error occurred during database dump:\n{err}')
 
     if seven_zip_process.returncode == 0:
         logger.info(f'Database backup created and compressed successfully: {backup_filename}')
@@ -203,9 +203,6 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 filesize = os.path.getsize(backup_filename)
 
                 prev_file_size = db.get_previous_backup_size(row['id'])
-                if prev_file_size and filesize < 4096:
-                    raise Exception(f'Archive file is too small: {filesize}')
-
 
                 logger.info(f'Uploading {backup_filename} to B2')
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
