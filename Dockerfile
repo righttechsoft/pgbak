@@ -15,12 +15,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
     systemd  \
     libpam-systemd \
+    gnupg \
     gpg-agent \
+    lsb-release \
     p7zip-full
 
-RUN sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+RUN install -d -m 0755 /etc/apt/keyrings && \
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/keyrings/postgresql.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
-RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17
 
 RUN add-apt-repository ppa:deadsnakes/ppa
@@ -32,7 +35,7 @@ COPY . .
 
 RUN chmod +x add.sh && chmod +x list.sh
 
-RUN python3.13 -m pip install pipenv && pipenv install --python 3.13
+RUN python3.13 -m pip install pipenv && pipenv --python 3.13 lock && pipenv sync
 
 EXPOSE 8000
 
