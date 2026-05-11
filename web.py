@@ -86,8 +86,9 @@ async def index(request: Request):
     try:
         servers = db.get_all_servers_for_list()
         return templates.TemplateResponse(
+            request,
             "index.html",
-            {"request": request, "servers": servers}
+            {"servers": servers}
         )
     finally:
         db.close()
@@ -97,8 +98,9 @@ async def index(request: Request):
 async def add_form(request: Request):
     """Show add server form."""
     return templates.TemplateResponse(
+        request,
         "form.html",
-        {"request": request, "server": None, "action": "add"}
+        {"server": None, "action": "add"}
     )
 
 
@@ -144,8 +146,9 @@ async def edit_form(request: Request, server_id: int):
         if not server:
             raise HTTPException(status_code=404, detail="Server not found")
         return templates.TemplateResponse(
+            request,
             "form.html",
-            {"request": request, "server": server, "action": "edit"}
+            {"server": server, "action": "edit"}
         )
     finally:
         db.close()
@@ -237,8 +240,9 @@ async def view_logs(request: Request, server_id: int):
             raise HTTPException(status_code=404, detail="Server not found")
         logs = db.get_backup_logs(server_id)
         return templates.TemplateResponse(
+            request,
             "logs.html",
-            {"request": request, "server": server, "logs": logs}
+            {"server": server, "logs": logs}
         )
     finally:
         db.close()
