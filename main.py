@@ -202,7 +202,8 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 create_backup(connection_string, backup_filename, archive_password, format=format)
                 filesize = os.path.getsize(backup_filename)
 
-                if filesize<4096:
+                prev_file_size = db.get_previous_backup_size(row['id'])
+                if prev_file_size and filesize < 4096:
                     raise Exception(f'Archive file is too small: {filesize}')
 
 
@@ -215,7 +216,6 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
 
                 db.log_backup_success(row['id'], filesize)
 
-                prev_file_size = db.get_previous_backup_size(row['id'])
                 if prev_file_size:
                     diff = abs(prev_file_size - filesize) / ((prev_file_size + filesize) / 2) * 100
                     if diff > 10:
