@@ -216,7 +216,7 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 if prev_file_size:
                     diff = abs(prev_file_size - filesize) / ((prev_file_size + filesize) / 2) * 100
                     if diff > 10:
-                        raise Exception(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev_file_size}, now: {filesize}')
+                        logger.warning(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev_file_size}, now: {filesize}')
 
                 if row['hc_url_success']:
                     call_hc(row['hc_url_success'])
