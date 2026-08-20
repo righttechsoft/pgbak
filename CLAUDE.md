@@ -12,7 +12,9 @@ pgbak/
 ├── database.py             # SQLite database operations
 ├── web.py                  # FastAPI web interface
 ├── single_instance_helper.py # Prevents concurrent execution
-├── Dockerfile              # Container configuration (Python 3.13)
+├── test_pgbak.py           # Self-check for the backup guards (no framework, asserts)
+├── Dockerfile              # Multi-stage container build (Python 3.13)
+├── .dockerignore           # Keeps .git / venv / sqlite out of the build context
 ├── Pipfile                 # Python dependencies (Python 3.13)
 ├── crontab                 # Hourly backup schedule
 ├── templates/              # Jinja2 HTML templates for web UI
@@ -82,23 +84,32 @@ pgbak/
   - Relative time display for last backup column
 
 ### Dockerfile
-- Base: Ubuntu with Python 3.13 from deadsnakes PPA
-- Includes: PostgreSQL client 17, 7zip, cron
+Multi-stage, built for fast redeploys:
+- **base**: Ubuntu 24.04 + Python 3.13 (deadsnakes PPA), PostgreSQL client 17, 7zip, cron, rsyslog.
+  Both later stages start from this, so the slow apt work is done and cached once.
+- **builder**: adds compilers/headers (`build-essential`, `libpq-dev`, `python3.13-dev`) and builds
+  the virtualenv from `Pipfile`/`Pipfile.lock` **only**. Editing application code does not
+  invalidate this layer, so a code-only redeploy skips dependency installation entirely.
+- **runtime**: copies the finished `/app/.venv` from the builder, then the source. Compilers never
+  reach the final image.
+- `PIPENV_VENV_IN_PROJECT=1` puts the venv at `/app/.venv` so it can be copied between stages;
+  `pipenv run ...` still works inside the container.
+- Dependencies are re-locked only when `Pipfile`/`Pipfile.lock` change. To force a refresh:
+  `docker build --no-cache .`
 - **Startup**: Sets up cron, starts rsyslog, runs uvicorn web server
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MEZMO_INGESTION_KEY` | Yes* | Mezmo (LogDNA) logging key |
+| `MEZMO_INGESTION_KEY` | No | Mezmo (LogDNA) logging key; logging to stdout happens regardless |
 | `B2_KEY_ID` | No | Default Backblaze B2 key ID |
 | `B2_APP_KEY` | No | Default Backblaze B2 app key |
 | `B2_BUCKET` | No | Default Backblaze B2 bucket |
 | `ARCHIVE_PASSWORD` | No | Default archive encryption password |
 | `DB_PATH` | No | SQLite database path (default: backup.sqlite) |
 | `LOG_HOSTNAME` | No | Hostname for Mezmo logging |
-
-*Set to empty string if not using Mezmo logging
+| `BACKUP_TIMEOUT_SEC` | No | Kill a dump that runs longer than this (default: 14400 = 4h) |
 
 ## Key Workflows
 
@@ -131,11 +142,20 @@ docker run -d -p 8000:8000 \
 
 ## Important Implementation Details
 
-1. **Single Instance**: `SingleInstance('pgbak')` prevents concurrent backup runs using file locking
+1. **Single Instance**: `SingleInstance('pgbak')` prevents concurrent backup runs using file locking.
+   Only the `run` command takes the lock, so the config commands still work during a backup
 2. **Backup Size Validation**: Fails the backup (before upload) if the archive is >10% smaller than the last successful one; only warns if it is >10% larger
-3. **Health Checks**: Supports separate URLs for start/success/fail events (healthchecks.io compatible)
-4. **Compression**: Uses 7z with LZMA2, optional AES encryption (`-mhe=on`)
-5. **Schema Migration**: Database automatically migrates on startup to handle schema changes
+3. **Dump Exit Code**: `pg_dump`'s exit code is checked (after an explicit `wait()`), so a dump that
+   dies halfway cannot be compressed and uploaded as a "successful" backup
+4. **Timeout**: the dump/compress pipeline is killed after `BACKUP_TIMEOUT_SEC`; without it a hung
+   `pg_dump` would hold the single-instance lock forever and silently starve every later cron run
+5. **No shell**: `pg_dump` and `7z` are spawned as argument lists (no `shell=True`), so passwords
+   containing shell metacharacters or spaces are passed through intact
+6. **archive_name**: required, and must be unique within a run - two servers sharing a name would
+   append into the same 7z archive and overwrite each other in B2
+7. **Health Checks**: Supports separate URLs for start/success/fail events (healthchecks.io compatible)
+8. **Compression**: Uses 7z with LZMA2, optional AES encryption (`-mhe=on`)
+9. **Schema Migration**: Database automatically migrates on startup to handle schema changes
 
 ## Common Tasks
 

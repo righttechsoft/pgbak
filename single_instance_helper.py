@@ -27,7 +27,7 @@ class SingleInstance:
         self.fd = os.open(self.lock_file, os.O_CREAT | os.O_EXCL | os.O_RDWR)
       except OSError as e:
         if e.errno == 13:
-          logger.debug("Another instance is already running ({}), quitting.".
+          logger.warning("Another instance is already running ({}), quitting.".
                        format(self.lock_file))
           sys.exit(-1)
         logger.debug(e.errno)
@@ -40,7 +40,7 @@ class SingleInstance:
       try:
         fcntl.lockf(self.fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
       except IOError:
-        logger.debug("Another instance is already running ({}), quitting.".
+        logger.warning("Another instance is already running ({}), quitting.".
                      format(self.lock_file))
         sys.exit(-1)
 

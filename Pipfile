@@ -7,6 +7,9 @@ name = "pypi"
 b2 = "*"
 logdna = "*"
 prompt-toolkit = "*"
+# imported directly by main.py - they only happened to be installed as b2's dependencies
+requests = "*"
+tabulate = "*"
 idna = ">=3.7"
 fastapi = "*"
 uvicorn = {extras = ["standard"], version = "*"}

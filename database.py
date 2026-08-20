@@ -83,9 +83,11 @@ class Database:
             List of server rows
         """
         sql = 'SELECT * FROM servers'
-        if server_id:
-            sql += f' WHERE id = {server_id}'
-        c = self.conn.execute(sql)
+        params = ()
+        if server_id is not None:
+            sql += ' WHERE id = ?'
+            params = (server_id,)
+        c = self.conn.execute(sql, params)
         rows = c.fetchall()
         c.close()
         return rows
