@@ -164,9 +164,13 @@ def create_backup(
 
         pg_dump_process.stdout.close()  # 7z owns the read end now, so pg_dump gets EPIPE if 7z dies
 
+        started = time.monotonic()
         try:
+            # the dump itself lives here - it may legitimately run for hours
             _, seven_zip_stderr = seven_zip_process.communicate(timeout=BACKUP_TIMEOUT_SEC)
-            pg_dump_process.wait(timeout=60)  # also sets returncode - without a wait it stays None
+            # 7z can only have exited once pg_dump closed its stdout, so this just reaps it and
+            # sets returncode (reading .stderr never does) - but still bound it by what is left
+            pg_dump_process.wait(timeout=max(60, BACKUP_TIMEOUT_SEC - (time.monotonic() - started)))
         except subprocess.TimeoutExpired:
             seven_zip_process.kill()
             pg_dump_process.kill()
