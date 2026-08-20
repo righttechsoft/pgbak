@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import subprocess
 import fcntl
 import os
+import re
+from urllib.parse import urlparse, parse_qs, unquote
 
 from database import Database
 
@@ -30,6 +32,28 @@ app = FastAPI(title="PgBak Web UI")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+
+def conn_summary(value: str) -> str:
+    """user@host:port/db, plus the schema when the URI pins one. Never the password."""
+    if not value:
+        return "-"
+    parsed = urlparse(value)
+    host = parsed.hostname or "-"
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    summary = f"{parsed.username}@{host}" if parsed.username else host
+    database = (parsed.path or "").lstrip("/")
+    if database:
+        summary = f"{summary}/{database}"
+
+    query = unquote(parsed.query)
+    # either ?schema=name or the libpq form ?options=-csearch_path=name
+    schema = parse_qs(query).get("schema", [""])[0]
+    if not schema:
+        found = re.search(r"search_path\s*=\s*([^\s&,]+)", query)
+        schema = found.group(1) if found else ""
+    return f"{summary} [{schema}]" if schema else summary
 
 
 def relative_time(value: str) -> str:
@@ -75,6 +99,7 @@ def format_timestamp(value: str) -> str:
         return value
 
 
+templates.env.filters["conn_summary"] = conn_summary
 templates.env.filters["relative_time"] = relative_time
 templates.env.filters["format_timestamp"] = format_timestamp
 

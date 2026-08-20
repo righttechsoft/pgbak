@@ -234,7 +234,7 @@
                         {% for server in servers %}
                         <tr>
                             <td>{{ server.id }}</td>
-                            <td><div class="truncate" title="{{ server.connection_string }}">{{ server.connection_string }}</div></td>
+                            <td><div class="truncate" title="{{ server.connection_string | conn_summary }}">{{ server.connection_string | conn_summary }}</div></td>
                             <td>{{ server.frequency_hrs }}</td>
                             <td>{{ server.archive_name or '-' }}</td>
                             <td>{{ server.last_backup | relative_time }}</td>

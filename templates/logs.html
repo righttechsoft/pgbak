@@ -230,7 +230,7 @@
         <div class="content">
             <div class="server-info">
                 <h2>Server Information</h2>
-                <p><strong>Connection:</strong> {{ server.connection_string }}</p>
+                <p><strong>Connection:</strong> {{ server.connection_string | conn_summary }}</p>
                 <p><strong>Archive Name:</strong> {{ server.archive_name or '-' }}</p>
                 <p><strong>Frequency:</strong> {{ server.frequency_hrs }} hours</p>
             </div>

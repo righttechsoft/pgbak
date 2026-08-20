@@ -4,6 +4,17 @@ import shutil
 import tempfile
 
 import main
+import web
+
+# --- the UI must show user/host/port/db (+schema) and never the password ---
+assert web.conn_summary('postgresql://backuper:s3cret@10.0.0.5:5432/shop') == 'backuper@10.0.0.5:5432/shop'
+assert web.conn_summary('postgresql://backuper:s3cret@db.example.com/shop') == 'backuper@db.example.com/shop'
+assert web.conn_summary('postgres://u:p@h:6543/db?schema=analytics') == 'u@h:6543/db [analytics]'
+assert web.conn_summary('postgres://u:p@h/db?options=-csearch_path%3Dofficeboxes') == 'u@h/db [officeboxes]'
+assert web.conn_summary('') == '-'
+for uri in ['postgresql://backuper:s3cret@10.0.0.5:5432/shop', 'postgres://u:p@h/db?schema=x', 'not a uri']:
+    assert 's3cret' not in web.conn_summary(uri) and 'p@' not in web.conn_summary(uri), uri
+
 
 # --- size guard: a shrinking archive is a failed dump, a growing one is fine ---
 assert main.size_dropped(1000, 899) is True
