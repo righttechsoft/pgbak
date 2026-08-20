@@ -203,6 +203,9 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
                 filesize = os.path.getsize(backup_filename)
 
                 prev_file_size = db.get_previous_backup_size(row['id'])
+                # a shrinking dump means truncated/partial data - fail before it reaches B2
+                if prev_file_size and filesize < prev_file_size * 0.9:
+                    raise Exception(f'Archive shrank by more than 10%: was {prev_file_size}, now {filesize} bytes')
 
                 logger.info(f'Uploading {backup_filename} to B2')
                 b2_key_id = row['B2_KEY_ID'] if row['B2_KEY_ID'] else os.environ.get('B2_KEY_ID')
@@ -213,10 +216,9 @@ def run_backup(db: Database, force=False, server_id=None, format='sql'):
 
                 db.log_backup_success(row['id'], filesize)
 
-                if prev_file_size:
-                    diff = abs(prev_file_size - filesize) / ((prev_file_size + filesize) / 2) * 100
-                    if diff > 10:
-                        logger.warning(f'The file size of {conn_details["host"]}/{conn_details["database"]} differs from the previous one by {diff}%! Was: {prev_file_size}, now: {filesize}')
+                if prev_file_size and filesize > prev_file_size * 1.1:
+                    growth = (filesize - prev_file_size) / prev_file_size * 100
+                    logger.warning(f'The file size of {conn_details["host"]}/{conn_details["database"]} grew by {growth:.1f}% since the previous backup! Was: {prev_file_size}, now: {filesize}')
 
                 if row['hc_url_success']:
                     call_hc(row['hc_url_success'])

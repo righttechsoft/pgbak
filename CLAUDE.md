@@ -31,20 +31,37 @@ pgbak/
 - **Backup process**:
   1. Reads server configs from SQLite
   2. Checks if backup frequency threshold reached
-  3. Calls health check start endpoint (if configured)
+  3. Calls `hc_url_start` (if configured)
   4. Runs `pg_dump` piped to `7z` for compression
   5. Uploads to Backblaze B2
-  6. Logs result and calls health check completion
+  6. Logs result to database (updates `last_backup` and `last_backup_result`)
+  7. Calls `hc_url_success` or `hc_url_fail` accordingly
 - **Backup formats**: `sql` (plain text) or `binary` (PostgreSQL custom format)
 - Uses `SingleInstance` to prevent concurrent runs
 
 ### database.py
 - SQLite database wrapper class
 - **Tables**:
-  - `servers`: connection_string, frequency_hrs, B2 credentials, archive settings, healthcheck URLs
-  - `backup_log`: timestamp, result, file_size, success flag
+  - `servers`: Server configurations
+  - `backup_log`: Backup history with timestamp, result, file_size, success flag
 - Database path configurable via `DB_PATH` env var (default: `backup.sqlite`)
 - **Schema migration**: Automatically removes obsolete columns and migrates legacy `dms_id` to `hc_url_success`
+
+#### Server Configuration Fields
+| Field | Description |
+|-------|-------------|
+| `connection_string` | PostgreSQL URI |
+| `frequency_hrs` | Backup frequency in hours |
+| `B2_KEY_ID` | Backblaze B2 key ID (overrides env) |
+| `B2_APP_KEY` | Backblaze B2 app key (overrides env) |
+| `B2_BUCKET` | Backblaze B2 bucket (overrides env) |
+| `archive_name` | Base name for backup files |
+| `archive_password` | 7z encryption password (overrides env) |
+| `hc_url_start` | Healthcheck URL called on backup start |
+| `hc_url_success` | Healthcheck URL called on success |
+| `hc_url_fail` | Healthcheck URL called on failure |
+| `last_backup` | Timestamp of last backup attempt |
+| `last_backup_result` | Result of last backup (Success/Failed) |
 
 ### web.py
 - FastAPI application on port 8000
@@ -53,9 +70,16 @@ pgbak/
   - `GET/POST /add` - Add server
   - `GET/POST /edit/{id}` - Edit server
   - `POST /delete/{id}` - Delete server
-  - `POST /run/{id}` - Trigger manual backup for a server
-  - `GET /logs/{id}` - View backup logs
-- **UI Features**: Password visibility toggle, favicon support, Run button for manual backups
+  - `POST /run/{id}` - Trigger manual backup (checks lock file to prevent concurrent runs)
+  - `GET /logs/{id}` - View backup logs with formatted timestamps
+- **Jinja2 Filters**:
+  - `relative_time` - Converts timestamp to "X minutes ago" format
+  - `format_timestamp` - Converts timestamp to "DD Mon YY HH:MM (relative time)" format
+- **UI Features**:
+  - Password visibility toggle (eye button)
+  - Favicon support via `/static/` mount
+  - Run button for manual backups with status feedback
+  - Relative time display for last backup column
 
 ### Dockerfile
 - Base: Ubuntu with Python 3.13 from deadsnakes PPA
@@ -108,11 +132,10 @@ docker run -d -p 8000:8000 \
 ## Important Implementation Details
 
 1. **Single Instance**: `SingleInstance('pgbak')` prevents concurrent backup runs using file locking
-2. **Backup Size Validation**: Alerts if backup size differs >10% from previous backup
-3. **Minimum Size Check**: Rejects backups smaller than 4KB as likely failures
-4. **Health Checks**: Supports separate URLs for start/success/fail events (healthchecks.io compatible)
-5. **Compression**: Uses 7z with LZMA2, optional AES encryption (`-mhe=on`)
-6. **Schema Migration**: Database automatically migrates on startup to handle schema changes
+2. **Backup Size Validation**: Fails the backup (before upload) if the archive is >10% smaller than the last successful one; only warns if it is >10% larger
+3. **Health Checks**: Supports separate URLs for start/success/fail events (healthchecks.io compatible)
+4. **Compression**: Uses 7z with LZMA2, optional AES encryption (`-mhe=on`)
+5. **Schema Migration**: Database automatically migrates on startup to handle schema changes
 
 ## Common Tasks
 
