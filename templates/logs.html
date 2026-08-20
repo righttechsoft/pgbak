@@ -158,6 +158,36 @@
             word-break: break-word;
         }
         
+        .result-details summary {
+            cursor: pointer;
+            color: #64748b;
+        }
+
+        .result-details summary:hover {
+            color: #334155;
+        }
+
+        .result-details[open] summary {
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .result-details pre {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 400px;
+            overflow: auto;
+            color: #475569;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -238,8 +268,14 @@
                                 <div class="error-details">
                                     {% if log.success == '1' %}
                                     <span style="color: #10b981; font-weight: 500;">{{ log.result }}</span>
+                                    {% elif log.result|length > 200 %}
+                                    <details class="result-details">
+                                        {# last line of a traceback is the actual error - the first 200 chars are just "Traceback (most recent call last)" #}
+                                        <summary>{{ ((log.result.strip().splitlines() or ['-'])[-1])[:200] }}</summary>
+                                        <pre>{{ log.result }}</pre>
+                                    </details>
                                     {% else %}
-                                    {{ log.result[:200] }}{% if log.result|length > 200 %}...{% endif %}
+                                    {{ log.result }}
                                     {% endif %}
                                 </div>
                             </td>
