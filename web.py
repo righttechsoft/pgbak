@@ -56,6 +56,27 @@ def conn_summary(value: str) -> str:
     return f"{summary} [{schema}]" if schema else summary
 
 
+def encryption_source(server) -> dict:
+    """Whether archives are encrypted, and with whose password."""
+    if server["archive_password"]:
+        return {"kind": "local", "label": "Local", "hint": "password set on this record"}
+    if os.environ.get("ARCHIVE_PASSWORD"):
+        return {"kind": "global", "label": "Global", "hint": "inherited from $ARCHIVE_PASSWORD"}
+    return {"kind": "missing", "label": "None", "hint": "no password anywhere - archives are NOT encrypted"}
+
+
+def b2_source(server) -> dict:
+    """B2 needs three values, and each one falls back to the environment on its own."""
+    overrides = [server["B2_KEY_ID"], server["B2_APP_KEY"], server["B2_BUCKET"]]
+    if all(overrides):
+        return {"kind": "local", "label": "Local", "hint": "key, secret and bucket set on this record"}
+    if any(overrides):
+        return {"kind": "mixed", "label": "Mixed", "hint": "part on the record, the rest from the environment"}
+    if all(os.environ.get(name) for name in ("B2_KEY_ID", "B2_APP_KEY", "B2_BUCKET")):
+        return {"kind": "global", "label": "Global", "hint": "inherited from the B2_* environment variables"}
+    return {"kind": "missing", "label": "Not set", "hint": "no B2 credentials on the record or in the environment"}
+
+
 def relative_time(value: str) -> str:
     """Convert timestamp (YYYYMMDDTHHMMSS) to relative time string."""
     if not value:
@@ -99,6 +120,7 @@ def format_timestamp(value: str) -> str:
         return value
 
 
+templates.env.globals.update(encryption_source=encryption_source, b2_source=b2_source)
 templates.env.filters["conn_summary"] = conn_summary
 templates.env.filters["relative_time"] = relative_time
 templates.env.filters["format_timestamp"] = format_timestamp

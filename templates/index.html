@@ -135,7 +135,7 @@
         }
         
         th {
-            padding: 16px;
+            padding: 14px 12px;
             text-align: left;
             font-weight: 600;
             color: #475569;
@@ -144,7 +144,7 @@
         }
         
         td {
-            padding: 16px;
+            padding: 12px;
             border-bottom: 1px solid #e2e8f0;
             color: #334155;
         }
@@ -183,7 +183,7 @@
         }
         
         .truncate {
-            max-width: 200px;
+            max-width: 340px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -206,6 +206,40 @@
             background: #fee2e2;
             color: #991b1b;
         }
+
+        .src {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: help;
+        }
+
+        .src-local {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .src-global {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .src-mixed {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .src-missing {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -221,10 +255,11 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Connection String</th>
-                            <th>Frequency (hrs)</th>
+                            <th>Connection</th>
                             <th>Archive Name</th>
+                            <th>Freq</th>
+                            <th title="Where the 7z password comes from">Encryption</th>
+                            <th title="Where the Backblaze B2 credentials come from">B2</th>
                             <th>Last Backup</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -233,11 +268,18 @@
                     <tbody>
                         {% for server in servers %}
                         <tr>
-                            <td>{{ server.id }}</td>
                             <td><div class="truncate" title="{{ server.connection_string | conn_summary }}">{{ server.connection_string | conn_summary }}</div></td>
-                            <td>{{ server.frequency_hrs }}</td>
                             <td>{{ server.archive_name or '-' }}</td>
-                            <td>{{ server.last_backup | relative_time }}</td>
+                            <td class="nowrap">{{ server.frequency_hrs }}h</td>
+                            <td>
+                                {% set enc = encryption_source(server) %}
+                                <span class="src src-{{ enc.kind }}" title="{{ enc.hint }}">{{ '🔓' if enc.kind == 'missing' else '🔒' }} {{ enc.label }}</span>
+                            </td>
+                            <td>
+                                {% set b2 = b2_source(server) %}
+                                <span class="src src-{{ b2.kind }}" title="{{ b2.hint }}">{{ b2.label }}</span>
+                            </td>
+                            <td class="nowrap">{{ server.last_backup | relative_time }}</td>
                             <td>
                                 {% if server.last_backup_result == 'Success' %}
                                 <span class="badge badge-success">Success</span>
