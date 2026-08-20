@@ -118,6 +118,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def pg_dump_error_summary(stderr: str, limit: int = 2000) -> str:
+    """Keep the lines that say what went wrong.
+
+    On a failed query pg_dump prints the reason and then the whole failing statement -
+    a LOCK TABLE over a few dozen tables is thousands of characters, so a plain tail of
+    the log shows only that statement and hides the reason above it.
+    """
+    errors = [line[:500] for line in stderr.splitlines() if 'error:' in line.lower()]
+    return '\n'.join(errors)[-limit:] if errors else stderr[-limit:]
+
+
 def size_dropped(prev_file_size, filesize, tolerance=0.1) -> bool:
     """True if the new archive is more than `tolerance` smaller than the last good one."""
     return bool(prev_file_size) and filesize < prev_file_size * (1 - tolerance)
@@ -189,7 +200,7 @@ def create_backup(
     # a dump that died halfway still compresses fine - only the exit code says the data is complete
     if pg_dump_process.returncode != 0:
         raise Exception(f'pg_dump exited with {pg_dump_process.returncode}, '
-                        f'backup is incomplete:\n{pg_dump_stderr[-2000:]}')
+                        f'backup is incomplete:\n{pg_dump_error_summary(pg_dump_stderr)}')
 
     logger.info(f'Database backup created and compressed successfully: {backup_filename}')
 

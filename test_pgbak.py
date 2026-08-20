@@ -12,6 +12,19 @@ assert main.size_dropped(1000, 5000) is False
 assert main.size_dropped(None, 1) is False     # first ever backup has no baseline
 assert main.size_dropped(0, 1) is False
 
+# --- error summary must survive a multi-thousand-character failing query ---
+noisy = '\n'.join([
+    'pg_dump: last built-in OID is 16383',
+    'pg_dump: reading extensions',
+    'pg_dump: error: query failed: ERROR:  canceling statement due to lock timeout',
+    'pg_dump: detail: Query was: LOCK TABLE ' + ', '.join(f'public.t{i}' for i in range(300)) + ' IN ACCESS SHARE MODE',
+])
+summary = main.pg_dump_error_summary(noisy)
+assert 'lock timeout' in summary, summary          # the reason survives...
+assert len(summary) < 600, len(summary)            # ...and the giant query does not
+assert 'reading extensions' not in summary
+assert main.pg_dump_error_summary('no errors here') == 'no errors here'  # falls back to the tail
+
 # --- connection string parsing ---
 c = main.parse_postgres_connection_string('postgresql://user:pass@db.example.com:5433/mydb')
 assert c['host'] == 'db.example.com' and c['port'] == 5433 and c['database'] == 'mydb', c
